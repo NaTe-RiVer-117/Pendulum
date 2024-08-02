@@ -1,0 +1,6 @@
+.vercel
+# Ignore node_modules directory
+node_modules/
+
+# Ignore pendulum3 directory
+Pendulum3/
