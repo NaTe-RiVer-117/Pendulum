@@ -52,10 +52,12 @@ function Shell() {
   const [post, setPost] = useState(DEFAULT_POST);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const [fullscreen, setFullscreen] = useState(false);
   const past = useRef([]);
   const future = useRef([]);
   const present = useRef({});
   const postGesture = useRef(false);
+  const rootRef = useRef(null);
   const { screenToFlowPosition } = useReactFlow();
   const onStatus = useCallback((label) => setBackendLabel(label), []);
   present.current = { nodes, edges, post, shaderName, activePreset };
@@ -110,6 +112,37 @@ function Shell() {
     window.addEventListener("pointerup", endGesture);
     return () => window.removeEventListener("pointerup", endGesture);
   }, []);
+
+  useEffect(() => {
+    function onFullscreen() {
+      setFullscreen(document.fullscreenElement === rootRef.current);
+    }
+    function onEscape(event) {
+      if (event.key !== "Escape" || document.fullscreenElement !== rootRef.current) return;
+      document.exitFullscreen().catch(() => {});
+    }
+    document.addEventListener("fullscreenchange", onFullscreen);
+    window.addEventListener("keydown", onEscape, true);
+    return () => {
+      document.removeEventListener("fullscreenchange", onFullscreen);
+      window.removeEventListener("keydown", onEscape, true);
+    };
+  }, []);
+
+  async function toggleFullscreen() {
+    const root = rootRef.current;
+    if (!root) return;
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+        return;
+      }
+      setSheet(null);
+      await root.requestFullscreen();
+    } catch (error) {
+      setNotice(error?.message || "Fullscreen was blocked.");
+    }
+  }
 
   useEffect(() => {
     if (!menuOpen && !presetsOpen) return undefined;
@@ -321,7 +354,12 @@ function Shell() {
   }
 
   return (
-    <div className="app" data-sheet={sheet || "none"}>
+    <div
+      ref={rootRef}
+      className={`app${fullscreen ? " is-fullscreen" : ""}`}
+      data-sheet={sheet || "none"}
+      data-fullscreen={fullscreen ? "true" : "false"}
+    >
       <header className="top-line">
         <input
           className="shader-name"
@@ -394,6 +432,11 @@ function Shell() {
             </div>
           )}
         </div>
+        {fullscreen && (
+          <button type="button" className="fullscreen-exit" data-testid="fullscreen" onClick={toggleFullscreen}>
+            Exit
+          </button>
+        )}
         </div>
       </header>
       <div className="workspace">
@@ -416,6 +459,11 @@ function Shell() {
           <Palette onAdd={addKind} />
         </div>
         <main className="canvas">
+          {!fullscreen && (
+            <button type="button" className="fullscreen-toggle" data-testid="fullscreen" onClick={toggleFullscreen}>
+              Fullscreen
+            </button>
+          )}
           <GraphCanvas
             nodes={nodes}
             edges={edges}
@@ -456,14 +504,26 @@ function Shell() {
               {compiled.error}
             </p>
           )}
+          {!fullscreen && (
+            <Inspector
+              selected={selected}
+              onChange={updateValue}
+              onDelete={deleteNode}
+              onNotice={onNotice}
+            />
+          )}
+        </aside>
+      </div>
+      {fullscreen && selected && (
+        <div className="float-inspector">
           <Inspector
             selected={selected}
             onChange={updateValue}
             onDelete={deleteNode}
             onNotice={onNotice}
           />
-        </aside>
-      </div>
+        </div>
+      )}
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} onAdd={addKind} />
       {exportOpen && (
         <div className="modal" role="dialog" aria-label="Exported TSL">

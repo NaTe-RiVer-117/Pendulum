@@ -63,6 +63,7 @@ textarea:focus-visible {
 }
 
 .app {
+  position: relative;
   height: 100%;
   width: 100%;
   min-width: 0;
@@ -150,6 +151,7 @@ textarea:focus-visible {
 }
 
 .canvas {
+  position: relative;
   width: 100%;
   min-width: 0;
   max-width: 100%;
@@ -157,6 +159,18 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+.fullscreen-toggle {
+  position: absolute;
+  z-index: 5;
+  top: 10px;
+  right: 12px;
+  min-height: 32px;
+  padding: 0 10px;
+  color: #d6d2c8;
+  background: rgba(7, 8, 10, 0.72);
+  border-radius: 8px;
 }
 
 .preview-frame {
@@ -975,6 +989,47 @@ textarea:focus-visible {
     width: min(320px, calc(100vw - 24px));
     max-height: min(70vh, 520px);
   }
+}
+
+.app.is-fullscreen .mesh,
+.app.is-fullscreen .sheet-toggle {
+  display: none;
+}
+
+.app.is-fullscreen .workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.app.is-fullscreen .library-wrap,
+.app.is-fullscreen .library-wrap.open,
+.app.is-fullscreen .preview-column,
+.app.is-fullscreen .preview-column.open {
+  display: none;
+}
+
+.fullscreen-exit {
+  min-height: 36px;
+  color: #d6f25c;
+  font-size: 14px;
+}
+
+.float-inspector {
+  position: absolute;
+  z-index: 6;
+  top: 64px;
+  right: 16px;
+  width: 280px;
+}
+
+.float-inspector .inspector {
+  flex: none;
+  width: 280px;
+  max-height: min(440px, calc(100vh - 96px));
+  border: 1px solid rgba(244, 241, 234, 0.12);
+  border-radius: 16px;
+  background: #101114;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
 }
 
 @media (prefers-reduced-motion: reduce) {
