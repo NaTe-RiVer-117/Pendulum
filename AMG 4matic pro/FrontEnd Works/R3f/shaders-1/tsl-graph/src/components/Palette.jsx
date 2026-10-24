@@ -1,0 +1,96 @@
+import { useMemo, useState } from "react";
+import { CATALOG, LIBRARY_GROUPS } from "../graph/catalog.js";
+import { TYPE_COLOR, VALUE_TYPES } from "../graph/types.js";
+
+export function Palette({ onAdd }) {
+  const [query, setQuery] = useState("");
+  const [openGroups, setOpenGroups] = useState(() => new Set(["Input"]));
+  const needle = query.trim().toLowerCase();
+  const groups = useMemo(() => {
+    return LIBRARY_GROUPS.map((group) => ({
+      ...group,
+      kinds: group.kinds.filter((kind) => {
+        const def = CATALOG[kind];
+        const haystack = `${def.label} ${def.blurb} ${group.id} ${kind}`.toLowerCase();
+        return haystack.includes(needle);
+      }),
+    })).filter((group) => group.kinds.length > 0);
+  }, [needle]);
+
+  function toggleGroup(id) {
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  return (
+    <aside className="palette">
+      <div className="library-head">
+        <strong>Nodes</strong>
+        <span>Ctrl+K</span>
+      </div>
+      <label className="search">
+        <span>Find a node</span>
+        <input
+          data-testid="palette-search"
+          value={query}
+          placeholder="Search nodes"
+          onChange={(event) => setQuery(event.target.value)}
+        />
+      </label>
+      <div className="palette-list">
+        {groups.map((group) => {
+          const expanded = needle.length > 0 || openGroups.has(group.id);
+          return (
+            <section key={group.id} className="library-group" data-testid={`group-${group.id}`}>
+              <button
+                type="button"
+                className="group-toggle"
+                aria-expanded={expanded}
+                onClick={() => toggleGroup(group.id)}
+              >
+                <span>{group.id}</span>
+                <small>{group.kinds.length}</small>
+              </button>
+              {expanded &&
+                group.kinds.map((kind) => {
+                  const def = CATALOG[kind];
+                  if (kind === "material") {
+                    return (
+                      <p key={kind} className="library-note">
+                        Material is already in the graph.
+                      </p>
+                    );
+                  }
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      className="node-add"
+                      data-testid={`add-${kind}`}
+                      onClick={() => onAdd(kind)}
+                    >
+                      <strong>{def.label}</strong>
+                      <small>{def.blurb || def.category}</small>
+                    </button>
+                  );
+                })}
+            </section>
+          );
+        })}
+        {groups.length === 0 && <p className="empty">No matching nodes.</p>}
+      </div>
+      <div className="legend">
+        {VALUE_TYPES.map((type) => (
+          <span key={type}>
+            <i style={{ background: TYPE_COLOR[type] }} />
+            {type}
+          </span>
+        ))}
+      </div>
+    </aside>
+  );
+}
