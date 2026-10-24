@@ -55,12 +55,14 @@ function Shell() {
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
+  const [sceneFullscreen, setSceneFullscreen] = useState(false);
   const past = useRef([]);
   const future = useRef([]);
   const present = useRef({});
   const postGesture = useRef(false);
   const sceneGesture = useRef(false);
   const rootRef = useRef(null);
+  const sceneRootRef = useRef(null);
   const { screenToFlowPosition } = useReactFlow();
   const onStatus = useCallback((label) => setBackendLabel(label), []);
   present.current = { nodes, edges, post, scene, shaderName, activePreset };
@@ -120,10 +122,14 @@ function Shell() {
 
   useEffect(() => {
     function onFullscreen() {
-      setFullscreen(document.fullscreenElement === rootRef.current);
+      const current = document.fullscreenElement;
+      setFullscreen(current === rootRef.current);
+      setSceneFullscreen(current === sceneRootRef.current);
     }
     function onEscape(event) {
-      if (event.key !== "Escape" || document.fullscreenElement !== rootRef.current) return;
+      if (event.key !== "Escape") return;
+      const current = document.fullscreenElement;
+      if (current !== rootRef.current && current !== sceneRootRef.current) return;
       document.exitFullscreen().catch(() => {});
     }
     document.addEventListener("fullscreenchange", onFullscreen);
@@ -138,11 +144,27 @@ function Shell() {
     const root = rootRef.current;
     if (!root) return;
     try {
-      if (document.fullscreenElement) {
+      if (document.fullscreenElement === root) {
         await document.exitFullscreen();
         return;
       }
+      if (document.fullscreenElement) await document.exitFullscreen();
       setSheet(null);
+      await root.requestFullscreen();
+    } catch (error) {
+      setNotice(error?.message || "Fullscreen was blocked.");
+    }
+  }
+
+  async function toggleSceneFullscreen() {
+    const root = sceneRootRef.current;
+    if (!root) return;
+    try {
+      if (document.fullscreenElement === root) {
+        await document.exitFullscreen();
+        return;
+      }
+      if (document.fullscreenElement) await document.exitFullscreen();
       await root.requestFullscreen();
     } catch (error) {
       setNotice(error?.message || "Fullscreen was blocked.");
@@ -276,6 +298,14 @@ function Shell() {
     setPost((current) => ({ ...current, [id]: { ...current[id], [key]: value } }));
   }
 
+  function removePost(id) {
+    remember();
+    setPost((current) => ({
+      ...current,
+      [id]: { ...current[id], present: false, enabled: false },
+    }));
+  }
+
   function beginScene() {
     if (sceneGesture.current) return;
     sceneGesture.current = true;
@@ -392,6 +422,37 @@ function Shell() {
     }
   }
 
+  const sceneControls = (
+    <>
+      <ScenePanel
+        scene={scene}
+        materialNode={nodes.find((node) => node.data.kind === "material")}
+        driven={{
+          color: edges.some(
+            (edge) =>
+              edge.targetHandle === "color" &&
+              edge.target === nodes.find((node) => node.data.kind === "material")?.id,
+          ),
+          metalness: edges.some(
+            (edge) =>
+              edge.targetHandle === "metalness" &&
+              edge.target === nodes.find((node) => node.data.kind === "material")?.id,
+          ),
+          roughness: edges.some(
+            (edge) =>
+              edge.targetHandle === "roughness" &&
+              edge.target === nodes.find((node) => node.data.kind === "material")?.id,
+          ),
+        }}
+        onBegin={beginScene}
+        onScene={editScene}
+        onCommit={commitScene}
+        onMaterial={writeMaterial}
+      />
+      <PostStack post={post} onToggle={togglePost} onBegin={beginPost} onValue={editPost} onRemove={removePost} />
+    </>
+  );
+
   return (
     <div
       ref={rootRef}
@@ -507,45 +568,47 @@ function Shell() {
               Close
             </button>
           </div>
-          <div className="preview-frame">
-            <Preview
-              compiled={compiled}
-              materialKey={materialKey}
-              scene={scene}
-              post={post}
-              onStatus={onStatus}
-            />
+          <div
+            className={`scene-stage${sceneFullscreen ? " is-scene-full" : ""}`}
+            ref={sceneRootRef}
+            data-scene-fullscreen={sceneFullscreen ? "true" : "false"}
+          >
+            <div className="preview-frame">
+              {!sceneFullscreen && (
+                <button
+                  type="button"
+                  className="scene-full-toggle"
+                  data-testid="scene-fullscreen"
+                  onClick={toggleSceneFullscreen}
+                >
+                  Fullscreen
+                </button>
+              )}
+              <Preview
+                compiled={compiled}
+                materialKey={materialKey}
+                scene={scene}
+                post={post}
+                onStatus={onStatus}
+              />
+            </div>
+            {sceneFullscreen && (
+              <aside className="scene-float">
+                <div className="scene-float-bar">
+                  <button type="button" className="fullscreen-exit" data-testid="scene-fullscreen" onClick={toggleSceneFullscreen}>
+                    Exit
+                  </button>
+                </div>
+                <div className="scene-float-scroll">{sceneControls}</div>
+              </aside>
+            )}
           </div>
           <p className="backend" data-testid="preview-status">
             {backendLabel}
           </p>
+          {!sceneFullscreen && (
           <div className="preview-scroll">
-            <ScenePanel
-              scene={scene}
-              materialNode={nodes.find((node) => node.data.kind === "material")}
-              driven={{
-                color: edges.some(
-                  (edge) =>
-                    edge.targetHandle === "color" &&
-                    edge.target === nodes.find((node) => node.data.kind === "material")?.id,
-                ),
-                metalness: edges.some(
-                  (edge) =>
-                    edge.targetHandle === "metalness" &&
-                    edge.target === nodes.find((node) => node.data.kind === "material")?.id,
-                ),
-                roughness: edges.some(
-                  (edge) =>
-                    edge.targetHandle === "roughness" &&
-                    edge.target === nodes.find((node) => node.data.kind === "material")?.id,
-                ),
-              }}
-              onBegin={beginScene}
-              onScene={editScene}
-              onCommit={commitScene}
-              onMaterial={writeMaterial}
-            />
-            <PostStack post={post} onToggle={togglePost} onBegin={beginPost} onValue={editPost} />
+            {sceneControls}
             {notice && (
               <p className="note" data-testid="notice">
                 {notice}
@@ -565,6 +628,7 @@ function Shell() {
               />
             )}
           </div>
+          )}
         </aside>
       </div>
       {fullscreen && selected && (

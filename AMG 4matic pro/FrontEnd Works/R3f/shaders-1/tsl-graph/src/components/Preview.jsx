@@ -34,25 +34,22 @@ class QuietBoundary extends Component {
   }
 }
 
+function effectOn(effect) {
+  return Boolean(effect && effect.present !== false && effect.enabled);
+}
+
 function PostPass({ post }) {
   const { gl, scene, camera } = useThree();
   const chain = useRef(null);
   const settings = sanitizePost(post);
-  const signature = [
-    settings.bloom.enabled,
-    settings.fringe.enabled,
-    settings.grain.enabled,
-    settings.grade.enabled,
-  ].join("|");
+  const signature = [settings.bloom, settings.fringe, settings.grain, settings.grade]
+    .map((effect) => (effectOn(effect) ? "1" : "0"))
+    .join("|");
   const live = useRef(settings);
   live.current = settings;
 
   useEffect(() => {
-    const any =
-      settings.bloom.enabled ||
-      settings.fringe.enabled ||
-      settings.grain.enabled ||
-      settings.grade.enabled;
+    const any = [settings.bloom, settings.fringe, settings.grain, settings.grade].some(effectOn);
     if (!any) {
       chain.current = null;
       return undefined;
@@ -60,22 +57,22 @@ function PostPass({ post }) {
     try {
       let color = pass(scene, camera).getTextureNode("output");
       const handles = {};
-      if (settings.bloom.enabled) {
+      if (effectOn(settings.bloom)) {
         const node = bloom(color, settings.bloom.strength, settings.bloom.radius, settings.bloom.threshold);
         handles.bloom = node;
         color = color.add(node);
       }
-      if (settings.fringe.enabled) {
+      if (effectOn(settings.fringe)) {
         const node = rgbShift(color, settings.fringe.amount, settings.fringe.angle);
         handles.fringe = node;
         color = node;
       }
-      if (settings.grain.enabled) {
+      if (effectOn(settings.grain)) {
         const intensity = uniform(settings.grain.intensity);
         handles.grain = intensity;
         color = film(color, intensity);
       }
-      if (settings.grade.enabled) {
+      if (effectOn(settings.grade)) {
         const contrast = uniform(settings.grade.contrast);
         const grade = uniform(settings.grade.saturation);
         handles.grade = { contrast, grade };
@@ -104,17 +101,17 @@ function PostPass({ post }) {
       return;
     }
     try {
-      if (current.handles.bloom) {
+      if (current.handles.bloom && next.bloom) {
         current.handles.bloom.strength.value = next.bloom.strength;
         current.handles.bloom.radius.value = next.bloom.radius;
         current.handles.bloom.threshold.value = next.bloom.threshold;
       }
-      if (current.handles.fringe) {
+      if (current.handles.fringe && next.fringe) {
         current.handles.fringe.amount.value = next.fringe.amount;
         current.handles.fringe.angle.value = next.fringe.angle;
       }
-      if (current.handles.grain) current.handles.grain.value = next.grain.intensity;
-      if (current.handles.grade) {
+      if (current.handles.grain && next.grain) current.handles.grain.value = next.grain.intensity;
+      if (current.handles.grade && next.grade) {
         current.handles.grade.contrast.value = next.grade.contrast;
         current.handles.grade.grade.value = next.grade.saturation;
       }

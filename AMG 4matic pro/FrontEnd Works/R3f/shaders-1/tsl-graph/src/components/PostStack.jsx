@@ -31,23 +31,29 @@ const EFFECTS = [
   },
 ];
 
-export function PostStack({ post, onToggle, onBegin, onValue }) {
+export function PostStack({ post, onToggle, onBegin, onValue, onRemove }) {
+  const visible = EFFECTS.filter((effect) => post[effect.id]?.present !== false);
   return (
     <section className="post-stack" data-testid="post-stack">
       <h2>Post</h2>
-      {EFFECTS.map((effect) => {
+      {visible.map((effect) => {
         const values = post[effect.id];
         return (
           <div className="post-effect" key={effect.id}>
-            <label className="post-switch">
-              <input
-                type="checkbox"
-                data-testid={`post-${effect.id}`}
-                checked={values.enabled}
-                onChange={(event) => onToggle(effect.id, event.target.checked)}
-              />
-              <span>{effect.label}</span>
-            </label>
+            <div className="post-effect-head">
+              <label className="post-switch">
+                <input
+                  type="checkbox"
+                  data-testid={`post-${effect.id}`}
+                  checked={values.enabled}
+                  onChange={(event) => onToggle(effect.id, event.target.checked)}
+                />
+                <span>{effect.label}</span>
+              </label>
+              <button type="button" data-testid={`post-remove-${effect.id}`} onClick={() => onRemove(effect.id)}>
+                Remove
+              </button>
+            </div>
             <div className="post-sliders">
               {effect.sliders.map((slider) => (
                 <label key={slider.key}>
