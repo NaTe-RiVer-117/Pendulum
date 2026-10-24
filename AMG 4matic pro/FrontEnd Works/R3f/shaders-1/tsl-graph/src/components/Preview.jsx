@@ -1,6 +1,6 @@
 import { Environment, OrbitControls } from "@react-three/drei";
 import { Canvas, extend, useFrame, useThree } from "@react-three/fiber";
-import { Component, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { Component, Suspense, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
 import { film } from "three/examples/jsm/tsl/display/FilmNode.js";
 import { rgbShift } from "three/examples/jsm/tsl/display/RGBShiftNode.js";
@@ -8,6 +8,7 @@ import { mix, pass, saturation, uniform, vec3, vec4 } from "three/tsl";
 import * as THREE from "three/webgpu";
 import { tickAudio } from "../audio/driver.js";
 import { sanitizePost } from "../graph/post.js";
+import { geometrySpec, sanitizeScene } from "../scene/scene.js";
 
 extend({
   MeshStandardNodeMaterial: THREE.MeshStandardNodeMaterial,
@@ -137,17 +138,50 @@ function FrameProbe({ onFrame }) {
   return null;
 }
 
-function Geometry({ primitive }) {
-  if (primitive === "box") return <boxGeometry args={[1.5, 1.5, 1.5]} />;
-  if (primitive === "torus") return <torusGeometry args={[0.7, 0.28, 48, 96]} />;
-  if (primitive === "knot") return <torusKnotGeometry args={[0.62, 0.2, 128, 24]} />;
-  return <sphereGeometry args={[1, 64, 64]} />;
+function Geometry({ object }) {
+  const spec = geometrySpec(object);
+  if (spec.element === "boxGeometry") return <boxGeometry args={spec.args} />;
+  if (spec.element === "torusGeometry") return <torusGeometry args={spec.args} />;
+  if (spec.element === "torusKnotGeometry") return <torusKnotGeometry args={spec.args} />;
+  if (spec.element === "cylinderGeometry") return <cylinderGeometry args={spec.args} />;
+  if (spec.element === "icosahedronGeometry") return <icosahedronGeometry args={spec.args} />;
+  if (spec.element === "planeGeometry") return <planeGeometry args={spec.args} />;
+  return <sphereGeometry args={spec.args} />;
 }
 
-function PreviewMesh({ shown, shownKey, primitive }) {
+function SceneLight({ light }) {
+  if (light.type === "ambient") return <ambientLight color={light.color} intensity={light.intensity} />;
+  if (light.type === "directional") {
+    return <directionalLight color={light.color} intensity={light.intensity} position={light.position} />;
+  }
+  if (light.type === "spot") {
+    return (
+      <spotLight
+        color={light.color}
+        intensity={light.intensity}
+        position={light.position}
+        angle={0.6}
+        penumbra={0.45}
+      />
+    );
+  }
+  return <pointLight color={light.color} intensity={light.intensity} position={light.position} distance={0} />;
+}
+
+function ViewRig({ fov }) {
+  const camera = useThree((state) => state.camera);
+  useLayoutEffect(() => {
+    camera.fov = fov;
+    camera.updateProjectionMatrix();
+  }, [camera, fov]);
+  return null;
+}
+
+function PreviewMesh({ shown, shownKey, object }) {
+  const rotation = object.rotation.map((degrees) => (degrees * Math.PI) / 180);
   return (
-    <mesh>
-      <Geometry primitive={primitive} />
+    <mesh position={object.position} rotation={rotation} scale={object.scale}>
+      <Geometry object={object} />
       {shown ? (
         <meshStandardNodeMaterial
           key={shownKey}
@@ -161,7 +195,7 @@ function PreviewMesh({ shown, shownKey, primitive }) {
   );
 }
 
-export function Preview({ compiled, materialKey, primitive, post, onStatus }) {
+export function Preview({ compiled, materialKey, scene, post, onStatus }) {
   const [frameloop, setFrameloop] = useState("never");
   const [backend, setBackend] = useState("starting");
   const [backendDetail, setBackendDetail] = useState("");
@@ -201,6 +235,8 @@ export function Preview({ compiled, materialKey, primitive, post, onStatus }) {
     return renderer;
   }, []);
 
+  const view = sanitizeScene(scene);
+
   const status =
     backend === "starting"
       ? "Starting WebGPU…"
@@ -215,27 +251,34 @@ export function Preview({ compiled, materialKey, primitive, post, onStatus }) {
   }, [onStatus, status]);
 
   return (
-    <div className="preview" data-testid="preview-stage" data-material-key={goodKey.current} data-backend={backend}>
+    <div
+      className="preview"
+      data-testid="preview-stage"
+      data-material-key={goodKey.current}
+      data-backend={backend}
+      data-primitive={view.object.primitive}
+    >
       <div className="frame-count" data-testid="frame-count">
         {frames}
       </div>
       <Canvas
         className="preview-canvas"
-        camera={{ position: [2.6, 1.45, 3.5], fov: 40 }}
+        camera={{ position: [2.6, 1.45, 3.5], fov: view.fov }}
         frameloop={frameloop}
         dpr={[1, 1.5]}
         gl={gl}
       >
-        <color attach="background" args={["#07080a"]} />
-        <ambientLight intensity={0.28} />
-        <directionalLight position={[4.5, 6, 3]} intensity={2.6} />
-        <directionalLight position={[-4, 1.6, -2]} intensity={0.55} color="#9ec5ff" />
+        <color attach="background" args={[view.background]} />
+        <ViewRig fov={view.fov} />
+        {view.lights.map((light) => (
+          <SceneLight key={light.id} light={light} />
+        ))}
         <Suspense fallback={null}>
           <QuietBoundary>
-            <Environment preset="sunset" environmentIntensity={0.7} />
+            <Environment preset="sunset" environmentIntensity={view.environment} />
           </QuietBoundary>
         </Suspense>
-        <PreviewMesh shown={good.current} shownKey={goodKey.current} primitive={primitive} />
+        <PreviewMesh shown={good.current} shownKey={goodKey.current} object={view.object} />
         <mesh rotation-x={-Math.PI / 2} position={[0, -1.15, 0]}>
           <circleGeometry args={[4.2, 64]} />
           <meshStandardNodeMaterial color="#1a1d24" roughness={0.92} metalness={0.04} />

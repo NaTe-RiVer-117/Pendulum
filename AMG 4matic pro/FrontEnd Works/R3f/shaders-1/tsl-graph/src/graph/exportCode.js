@@ -1,6 +1,7 @@
-import { CATALOG, INPUT_DEFAULTS } from "./catalog.js";
+import { CATALOG, INPUT_DEFAULTS, materialHint } from "./catalog.js";
 import { emitFormula, parseFormula } from "./formula.js";
 import { emitPost } from "./post.js";
+import { emitScene } from "../scene/scene.js";
 import { emitCurve, emitFourier } from "./series.js";
 import { analyze, explainGraph } from "./types.js";
 
@@ -118,7 +119,7 @@ function checkerSource() {
 }`;
 }
 
-export function exportGraph(nodes, edges, post) {
+export function exportGraph(nodes, edges, post, scene) {
   const problem = explainGraph(nodes, edges);
   if (problem) throw new Error(problem);
   const material = nodes.find((node) => node.data.kind === "material");
@@ -336,24 +337,23 @@ export function exportGraph(nodes, edges, post) {
     }
   }
 
-  const defaults = INPUT_DEFAULTS.material;
   const opacityEdge = incoming.get(`${material.id}:opacity`);
   lines.push("  const material = new THREE.MeshStandardNodeMaterial();");
   lines.push(
-    `  material.colorNode = ${inputExpr(material, "color", "color", defaults.color)};`,
+    `  material.colorNode = ${inputExpr(material, "color", "color", materialHint(material, "color"))};`,
   );
   lines.push(
-    `  material.roughnessNode = ${inputExpr(material, "roughness", "float", defaults.roughness)};`,
+    `  material.roughnessNode = ${inputExpr(material, "roughness", "float", materialHint(material, "roughness"))};`,
   );
   lines.push(
-    `  material.metalnessNode = ${inputExpr(material, "metalness", "float", defaults.metalness)};`,
+    `  material.metalnessNode = ${inputExpr(material, "metalness", "float", materialHint(material, "metalness"))};`,
   );
   lines.push(
-    `  material.emissiveNode = ${inputExpr(material, "emissive", "color", defaults.emissive)};`,
+    `  material.emissiveNode = ${inputExpr(material, "emissive", "color", materialHint(material, "emissive"))};`,
   );
   if (opacityEdge) {
     lines.push(
-      `  material.opacityNode = ${inputExpr(material, "opacity", "float", defaults.opacity)};`,
+      `  material.opacityNode = ${inputExpr(material, "opacity", "float", materialHint(material, "opacity"))};`,
     );
     lines.push("  material.transparent = true;");
   }
@@ -405,7 +405,8 @@ ${helper}
 export function createMaterial() {
 ${lines.join("\n")}
 }
-${emitPost(post)}`;
+${emitPost(post)}
+${emitScene(scene)}`;
 }
 
 function audioSource() {

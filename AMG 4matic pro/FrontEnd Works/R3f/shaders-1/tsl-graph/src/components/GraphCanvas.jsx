@@ -116,6 +116,7 @@ export function GraphCanvas({
     () =>
       edges.map((edge) => ({
         ...edge,
+        className: `wire wire-${edge.targetHandle || "out"}`,
         style: {
           stroke: socketColor(typing.outputType(edge.source, edge.sourceHandle)),
           strokeWidth: 2,

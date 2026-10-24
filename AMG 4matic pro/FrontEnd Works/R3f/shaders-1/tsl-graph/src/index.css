@@ -176,8 +176,8 @@ textarea:focus-visible {
 .preview-frame {
   position: relative;
   flex: none;
-  height: 200px;
-  margin: 14px 14px 0;
+  height: 116px;
+  margin: 6px 12px 0;
   border-radius: 16px;
   overflow: hidden;
   background: #07080a;
@@ -247,9 +247,127 @@ textarea:focus-visible {
   accent-color: #d6f25c;
 }
 
+.preview-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(214, 210, 200, 0.38) transparent;
+}
+
+.preview-scroll .inspector {
+  flex: none;
+  max-height: none;
+}
+
+.scene-panel {
+  padding: 4px 12px 2px;
+}
+
+.scene-panel h2,
+.scene-panel h3 {
+  margin: 0;
+  color: #8d887e;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.scene-panel h2 {
+  margin-bottom: 2px;
+}
+
+.scene-panel section + section {
+  margin-top: 4px;
+  padding-top: 3px;
+  border-top: 1px solid rgba(244, 241, 234, 0.08);
+}
+
+.scene-panel h3 {
+  margin-bottom: 2px;
+}
+
+.scene-slider,
+.scene-xyz {
+  display: grid;
+  grid-template-columns: 78px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px;
+  min-height: 18px;
+  color: #8d887e;
+  font-size: 11px;
+}
+
+.scene-xyz {
+  grid-template-columns: 78px repeat(3, minmax(0, 1fr));
+}
+
+.scene-panel input,
+.scene-panel select {
+  min-height: 22px;
+  width: 100%;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid rgba(244, 241, 234, 0.14);
+  color: #f4f1ea;
+  font-size: 12px;
+}
+
+.scene-panel input[type="color"] {
+  min-height: 18px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.scene-panel input[type="range"] {
+  accent-color: #d6f25c;
+  border: 0;
+}
+
+.scene-panel em {
+  color: #d6f25c;
+  font-style: normal;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.scene-light {
+  margin: 2px 0 0;
+}
+
+.scene-light header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 18px;
+  color: #d6d2c8;
+  font-size: 12px;
+}
+
+.scene-light header button,
+.scene-add button {
+  color: #b9b3a8;
+  font-size: 11px;
+}
+
+.scene-light header button:hover,
+.scene-add button:hover {
+  color: #d6f25c;
+}
+
+.scene-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-top: 4px;
+}
+
 .backend {
   margin: 0;
-  padding: 10px 16px 0;
+  padding: 4px 14px 0;
   color: #8d887e;
   font-size: 11px;
   letter-spacing: 0.12em;

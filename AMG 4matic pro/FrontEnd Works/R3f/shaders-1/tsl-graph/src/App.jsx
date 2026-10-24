@@ -8,6 +8,7 @@ import { Palette } from "./components/Palette.jsx";
 import { PostStack } from "./components/PostStack.jsx";
 import { PresetMenu } from "./components/PresetMenu.jsx";
 import { Preview } from "./components/Preview.jsx";
+import { ScenePanel } from "./components/ScenePanel.jsx";
 import { Tutorial } from "./components/Tutorial.jsx";
 import { createNode } from "./graph/catalog.js";
 import { compileGraph } from "./graph/compiler.js";
@@ -15,6 +16,7 @@ import { createExampleGraph } from "./graph/exampleGraph.js";
 import { exportGraph } from "./graph/exportCode.js";
 import { DEFAULT_POST } from "./graph/post.js";
 import { loadGraph, saveGraph } from "./graph/storage.js";
+import { DEFAULT_SCENE, sanitizeScene } from "./scene/scene.js";
 import { PRESETS } from "./presets/index.js";
 
 const HISTORY_LIMIT = 50;
@@ -32,7 +34,6 @@ function Shell() {
   const initial = useMemo(() => loadGraph(), []);
   const [nodes, setNodes, onNodesChange] = useNodesState(initial.nodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initial.edges);
-  const [primitive, setPrimitive] = useState("sphere");
   const [shaderName, setShaderName] = useState("Untitled");
   const [notice, setNotice] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
@@ -50,6 +51,7 @@ function Shell() {
   const [sheet, setSheet] = useState(null);
   const [backendLabel, setBackendLabel] = useState("Starting WebGPU…");
   const [post, setPost] = useState(DEFAULT_POST);
+  const [scene, setScene] = useState(DEFAULT_SCENE);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
   const [fullscreen, setFullscreen] = useState(false);
@@ -57,10 +59,11 @@ function Shell() {
   const future = useRef([]);
   const present = useRef({});
   const postGesture = useRef(false);
+  const sceneGesture = useRef(false);
   const rootRef = useRef(null);
   const { screenToFlowPosition } = useReactFlow();
   const onStatus = useCallback((label) => setBackendLabel(label), []);
-  present.current = { nodes, edges, post, shaderName, activePreset };
+  present.current = { nodes, edges, post, scene, shaderName, activePreset };
 
   function remember() {
     past.current.push(JSON.parse(JSON.stringify(present.current)));
@@ -74,6 +77,7 @@ function Shell() {
     setNodes(snap.nodes);
     setEdges(snap.edges);
     setPost(snap.post);
+    setScene(sanitizeScene(snap.scene));
     setShaderName(snap.shaderName);
     setActivePreset(snap.activePreset);
     setCanUndo(past.current.length > 0);
@@ -108,6 +112,7 @@ function Shell() {
   useEffect(() => {
     function endGesture() {
       postGesture.current = false;
+      sceneGesture.current = false;
     }
     window.addEventListener("pointerup", endGesture);
     return () => window.removeEventListener("pointerup", endGesture);
@@ -271,6 +276,40 @@ function Shell() {
     setPost((current) => ({ ...current, [id]: { ...current[id], [key]: value } }));
   }
 
+  function beginScene() {
+    if (sceneGesture.current) return;
+    sceneGesture.current = true;
+    remember();
+  }
+
+  function editScene(updater) {
+    setScene((current) => updater(current));
+  }
+
+  function commitScene(updater) {
+    remember();
+    setScene((current) => updater(current));
+  }
+
+  function writeMaterial(key, value) {
+    const material = nodes.find((node) => node.data.kind === "material");
+    if (!material) return;
+    if (edges.some((edge) => edge.target === material.id && edge.targetHandle === key)) return;
+    if (JSON.stringify(material.data.values?.[key]) === JSON.stringify(value)) return;
+    if (!sceneGesture.current) {
+      sceneGesture.current = true;
+      remember();
+    }
+    setTweakSignal((signal) => signal + 1);
+    setNodes((current) =>
+      current.map((item) =>
+        item.id === material.id
+          ? { ...item, data: { ...item.data, values: { ...item.data.values, [key]: value } } }
+          : item,
+      ),
+    );
+  }
+
   function addKind(kind) {
     const pane = document.querySelector("[data-testid='graph']");
     const rect = pane?.getBoundingClientRect();
@@ -316,7 +355,7 @@ function Shell() {
   async function copyExport() {
     setMenuOpen(false);
     try {
-      const code = exportGraph(nodes, edges, post);
+      const code = exportGraph(nodes, edges, post, scene);
       setExportText(code);
       setExportOpen(true);
       setExportSignal((value) => value + 1);
@@ -334,7 +373,7 @@ function Shell() {
   function downloadExport() {
     setMenuOpen(false);
     try {
-      const code = exportGraph(nodes, edges, post);
+      const code = exportGraph(nodes, edges, post, scene);
       const blob = new Blob([code], { type: "text/javascript" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -383,19 +422,6 @@ function Shell() {
           </button>
         </div>
         <div className="top-tools">
-        <label className="mesh">
-          Mesh
-          <select
-            data-testid="primitive"
-            value={primitive}
-            onChange={(event) => setPrimitive(event.target.value)}
-          >
-            <option value="sphere">Sphere</option>
-            <option value="box">Box</option>
-            <option value="torus">Torus</option>
-            <option value="knot">Torus knot</option>
-          </select>
-        </label>
         <PresetMenu
           presets={PRESETS}
           activePreset={activePreset}
@@ -485,7 +511,7 @@ function Shell() {
             <Preview
               compiled={compiled}
               materialKey={materialKey}
-              primitive={primitive}
+              scene={scene}
               post={post}
               onStatus={onStatus}
             />
@@ -493,25 +519,52 @@ function Shell() {
           <p className="backend" data-testid="preview-status">
             {backendLabel}
           </p>
-          <PostStack post={post} onToggle={togglePost} onBegin={beginPost} onValue={editPost} />
-          {notice && (
-            <p className="note" data-testid="notice">
-              {notice}
-            </p>
-          )}
-          {!compiled.ok && (
-            <p className="note warn" data-testid="compile-error">
-              {compiled.error}
-            </p>
-          )}
-          {!fullscreen && (
-            <Inspector
-              selected={selected}
-              onChange={updateValue}
-              onDelete={deleteNode}
-              onNotice={onNotice}
+          <div className="preview-scroll">
+            <ScenePanel
+              scene={scene}
+              materialNode={nodes.find((node) => node.data.kind === "material")}
+              driven={{
+                color: edges.some(
+                  (edge) =>
+                    edge.targetHandle === "color" &&
+                    edge.target === nodes.find((node) => node.data.kind === "material")?.id,
+                ),
+                metalness: edges.some(
+                  (edge) =>
+                    edge.targetHandle === "metalness" &&
+                    edge.target === nodes.find((node) => node.data.kind === "material")?.id,
+                ),
+                roughness: edges.some(
+                  (edge) =>
+                    edge.targetHandle === "roughness" &&
+                    edge.target === nodes.find((node) => node.data.kind === "material")?.id,
+                ),
+              }}
+              onBegin={beginScene}
+              onScene={editScene}
+              onCommit={commitScene}
+              onMaterial={writeMaterial}
             />
-          )}
+            <PostStack post={post} onToggle={togglePost} onBegin={beginPost} onValue={editPost} />
+            {notice && (
+              <p className="note" data-testid="notice">
+                {notice}
+              </p>
+            )}
+            {!compiled.ok && (
+              <p className="note warn" data-testid="compile-error">
+                {compiled.error}
+              </p>
+            )}
+            {!fullscreen && (
+              <Inspector
+                selected={selected}
+                onChange={updateValue}
+                onDelete={deleteNode}
+                onNotice={onNotice}
+              />
+            )}
+          </div>
         </aside>
       </div>
       {fullscreen && selected && (

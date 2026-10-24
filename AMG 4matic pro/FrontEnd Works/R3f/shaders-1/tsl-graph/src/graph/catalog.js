@@ -254,6 +254,17 @@ export const INPUT_DEFAULTS = {
   },
 };
 
+export function materialHint(node, key) {
+  const fallback = INPUT_DEFAULTS.material[key];
+  const raw = node?.data?.values?.[key];
+  if (raw === undefined || raw === null || raw === "") return fallback;
+  if (typeof fallback === "number") {
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : fallback;
+  }
+  return typeof raw === "string" ? raw : fallback;
+}
+
 function cloneValues(values) {
   const next = { ...values };
   if (Array.isArray(next.points)) next.points = next.points.map((point) => ({ ...point }));

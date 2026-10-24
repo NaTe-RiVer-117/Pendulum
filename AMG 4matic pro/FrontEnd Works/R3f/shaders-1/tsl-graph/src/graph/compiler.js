@@ -31,7 +31,7 @@ import {
   vec3 as tslVec3,
 } from "three/tsl";
 import { audioUniforms } from "../audio/driver.js";
-import { INPUT_DEFAULTS } from "./catalog.js";
+import { INPUT_DEFAULTS, materialHint } from "./catalog.js";
 import { compileFormula, parseFormula } from "./formula.js";
 import { compileCurve, compileFourier } from "./series.js";
 import { analyze, explainGraph } from "./types.js";
@@ -401,16 +401,15 @@ export function compileGraph(nodes, edges) {
       };
     }
     if (kind === "material") {
-      const defaults = INPUT_DEFAULTS.material;
       const opacityEdge = incoming.get(`${node.id}:opacity`);
       return {
         slots: {
-          colorNode: take(node, "color", "color", defaults.color),
-          roughnessNode: take(node, "roughness", "float", defaults.roughness),
-          metalnessNode: take(node, "metalness", "float", defaults.metalness),
-          emissiveNode: take(node, "emissive", "color", defaults.emissive),
+          colorNode: take(node, "color", "color", materialHint(node, "color")),
+          roughnessNode: take(node, "roughness", "float", materialHint(node, "roughness")),
+          metalnessNode: take(node, "metalness", "float", materialHint(node, "metalness")),
+          emissiveNode: take(node, "emissive", "color", materialHint(node, "emissive")),
           ...(opacityEdge
-            ? { opacityNode: take(node, "opacity", "float", defaults.opacity) }
+            ? { opacityNode: take(node, "opacity", "float", materialHint(node, "opacity")) }
             : {}),
         },
         transparent: Boolean(opacityEdge),
