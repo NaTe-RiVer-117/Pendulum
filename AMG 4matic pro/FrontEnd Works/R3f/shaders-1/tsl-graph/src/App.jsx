@@ -1,11 +1,15 @@
 import { ReactFlowProvider, useEdgesState, useNodesState, useReactFlow } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { ensureShaderMotion } from "./audio/driver.js";
+import { CommandPalette } from "./components/CommandPalette.jsx";
 import { GraphCanvas } from "./components/GraphCanvas.jsx";
 import { Inspector } from "./components/Inspector.jsx";
 import { Palette } from "./components/Palette.jsx";
 import { Preview } from "./components/Preview.jsx";
+import { Tutorial, tutorialSeen } from "./components/Tutorial.jsx";
 import { createNode } from "./graph/catalog.js";
 import { compileGraph } from "./graph/compiler.js";
+import { DEMOS } from "./graph/demos.js";
 import { createExampleGraph } from "./graph/exampleGraph.js";
 import { exportGraph } from "./graph/exportCode.js";
 import { loadGraph, saveGraph } from "./graph/storage.js";
@@ -27,13 +31,34 @@ function Shell() {
   const [notice, setNotice] = useState("");
   const [exportOpen, setExportOpen] = useState(false);
   const [exportText, setExportText] = useState("");
+  const [exportSignal, setExportSignal] = useState(0);
   const [fitToken, setFitToken] = useState(0);
+  const [demosOpen, setDemosOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(() => !tutorialSeen());
+  const [tutorialSession, setTutorialSession] = useState(0);
   const { screenToFlowPosition } = useReactFlow();
 
   useEffect(() => {
     const result = saveGraph({ nodes, edges });
     if (!result.ok) setNotice(result.error);
   }, [nodes, edges]);
+
+  const hasAudio = nodes.some((node) => node.data.kind === "audio");
+  useEffect(() => {
+    if (hasAudio) ensureShaderMotion();
+  }, [hasAudio]);
+
+  useEffect(() => {
+    function onKey(event) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setCommandOpen((open) => !open);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
 
   const signature = useMemo(
     () =>
@@ -93,15 +118,29 @@ function Shell() {
     position.y += Math.round((Math.random() - 0.5) * 36);
     const id = `${kind}-${crypto.randomUUID().slice(0, 8)}`;
     setNodes((current) => current.concat(createNode(kind, id, position)));
+    setNotice(`${kind} added.`);
   }
 
-  function resetExample() {
-    const next = createExampleGraph();
+  function loadGraphState(next, message) {
     setNodes(next.nodes);
     setEdges(next.edges);
     setFitToken((token) => token + 1);
     setExportOpen(false);
-    setNotice("Example graph restored.");
+    setDemosOpen(false);
+    setNotice(message);
+  }
+
+  function resetExample() {
+    loadGraphState(createExampleGraph(), "Example graph restored.");
+  }
+
+  function loadDemo(demo) {
+    loadGraphState(demo.build(), `${demo.label} loaded.`);
+  }
+
+  function openTutorial() {
+    setTutorialSession((session) => session + 1);
+    setTutorialOpen(true);
   }
 
   async function copyExport() {
@@ -109,6 +148,7 @@ function Shell() {
       const code = exportGraph(nodes, edges);
       setExportText(code);
       setExportOpen(true);
+      setExportSignal((value) => value + 1);
       try {
         await navigator.clipboard.writeText(code);
         setNotice("Export copied.");
@@ -120,15 +160,63 @@ function Shell() {
     }
   }
 
+  function downloadExport() {
+    try {
+      const code = exportGraph(nodes, edges);
+      const blob = new Blob([code], { type: "text/javascript" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "material.js";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 1500);
+      setExportText(code);
+      setExportOpen(true);
+      setExportSignal((value) => value + 1);
+      setNotice("Downloaded material.js.");
+    } catch (error) {
+      setNotice(error?.message || "Download failed.");
+    }
+  }
+
   return (
     <div className="app">
       <header className="toolbar">
         <div className="brand">
           <strong>TSL Graph</strong>
-          <span>MeshStandardNodeMaterial</span>
+          <span>Shader editor</span>
         </div>
+        <div className="menu">
+          <button
+            type="button"
+            data-testid="demos"
+            aria-expanded={demosOpen}
+            onClick={() => setDemosOpen((open) => !open)}
+          >
+            Demos
+          </button>
+          {demosOpen && (
+            <div className="menu-pop" data-testid="demo-menu">
+              {DEMOS.map((demo) => (
+                <button
+                  key={demo.id}
+                  type="button"
+                  data-testid={`demo-${demo.id}`}
+                  onClick={() => loadDemo(demo)}
+                >
+                  {demo.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <button type="button" data-testid="tutorial-open" onClick={openTutorial}>
+          Tutorial
+        </button>
         <label className="primitive">
-          Preview
+          Mesh
           <select
             data-testid="primitive"
             value={primitive}
@@ -141,10 +229,13 @@ function Shell() {
           </select>
         </label>
         <button type="button" data-testid="export" onClick={copyExport}>
-          Export
+          Copy export
+        </button>
+        <button type="button" data-testid="download" onClick={downloadExport}>
+          Download .js
         </button>
         <button type="button" data-testid="reset" onClick={resetExample}>
-          Reset example
+          Reset
         </button>
         <p className="notice" data-testid="notice">
           {notice}
@@ -157,15 +248,26 @@ function Shell() {
       </header>
       <div className="body">
         <Palette onAdd={addKind} />
-        <GraphCanvas
-          nodes={nodes}
-          edges={edges}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
-          setEdges={setEdges}
-          onNotice={onNotice}
-          fitToken={fitToken}
-        />
+        <div className="stage">
+          <GraphCanvas
+            nodes={nodes}
+            edges={edges}
+            onNodesChange={onNodesChange}
+            onEdgesChange={onEdgesChange}
+            setEdges={setEdges}
+            onNotice={onNotice}
+            fitToken={fitToken}
+          />
+          {tutorialOpen && (
+            <Tutorial
+              key={tutorialSession}
+              nodes={nodes}
+              edges={edges}
+              exportSignal={exportSignal}
+              onClose={() => setTutorialOpen(false)}
+            />
+          )}
+        </div>
         <div className="side">
           <Preview compiled={compiled} materialKey={materialKey} primitive={primitive} />
           <Inspector
@@ -176,6 +278,7 @@ function Shell() {
           />
         </div>
       </div>
+      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} onAdd={addKind} />
       {exportOpen && (
         <div className="modal" role="dialog" aria-label="Exported TSL">
           <div className="modal-card">

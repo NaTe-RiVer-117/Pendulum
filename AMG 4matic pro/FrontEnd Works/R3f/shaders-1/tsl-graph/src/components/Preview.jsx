@@ -2,6 +2,7 @@ import { Environment, OrbitControls } from "@react-three/drei";
 import { Canvas, extend, useFrame } from "@react-three/fiber";
 import { Component, Suspense, useCallback, useRef, useState } from "react";
 import * as THREE from "three/webgpu";
+import { tickAudio } from "../audio/driver.js";
 
 extend({
   MeshStandardNodeMaterial: THREE.MeshStandardNodeMaterial,
@@ -30,6 +31,7 @@ class QuietBoundary extends Component {
 function FrameProbe({ onFrame }) {
   const sent = useRef(0);
   useFrame(() => {
+    tickAudio();
     sent.current += 1;
     if (sent.current <= 3) onFrame(sent.current);
   });

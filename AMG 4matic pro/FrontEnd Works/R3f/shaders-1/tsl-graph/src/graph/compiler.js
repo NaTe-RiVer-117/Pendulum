@@ -6,6 +6,9 @@ import {
   color as tslColor,
   div as tslDiv,
   float as tslFloat,
+  ceil as tslCeil,
+  cos as tslCos,
+  floor as tslFloor,
   fract as tslFract,
   max as tslMax,
   min as tslMin,
@@ -17,14 +20,20 @@ import {
   pow as tslPow,
   sin as tslSin,
   smoothstep as tslSmoothstep,
+  sqrt as tslSqrt,
+  step as tslStep,
   sub as tslSub,
+  tan as tslTan,
   texture as tslTexture,
   time as tslTime,
   uv as tslUv,
   vec2 as tslVec2,
   vec3 as tslVec3,
 } from "three/tsl";
+import { audioUniforms } from "../audio/driver.js";
 import { INPUT_DEFAULTS } from "./catalog.js";
+import { compileFormula, parseFormula } from "./formula.js";
+import { compileCurve, compileFourier } from "./series.js";
 import { analyze, explainGraph } from "./types.js";
 
 const textureCache = new Map();
@@ -310,6 +319,83 @@ export function compileGraph(nodes, edges) {
       return {
         rgb: { value: sample.xyz, type: "color" },
         a: { value: sample.w, type: "float" },
+      };
+    }
+    if (kind === "fourier") {
+      const part = readInput(node, "t");
+      const sample = part?.type === "float" ? part.value : tslTime;
+      return {
+        out: {
+          value: compileFourier(sample, values, {
+            add: tslAdd,
+            mul: tslMul,
+            sin: tslSin,
+            float: tslFloat,
+          }),
+          type: "float",
+        },
+      };
+    }
+    if (kind === "formula") {
+      let ast;
+      try {
+        ast = parseFormula(values.expr);
+      } catch (error) {
+        throw new Error(error?.message || "Formula could not be parsed.");
+      }
+      return {
+        out: {
+          value: compileFormula(ast, {
+            float: tslFloat,
+            time: tslTime,
+            uv: tslUv,
+            add: tslAdd,
+            sub: tslSub,
+            mul: tslMul,
+            div: tslDiv,
+            sin: tslSin,
+            cos: tslCos,
+            tan: tslTan,
+            abs: tslAbs,
+            min: tslMin,
+            max: tslMax,
+            pow: tslPow,
+            sqrt: tslSqrt,
+            fract: tslFract,
+            mix: tslMix,
+            floor: tslFloor,
+            ceil: tslCeil,
+          }),
+          type: "float",
+        },
+      };
+    }
+    if (kind === "curve") {
+      const part = readInput(node, "t");
+      const sample = part?.type === "float" ? part.value : tslFloat(0);
+      return {
+        out: {
+          value: compileCurve(sample, values.points, {
+            add: tslAdd,
+            sub: tslSub,
+            mul: tslMul,
+            div: tslDiv,
+            mix: tslMix,
+            clamp: tslClamp,
+            step: tslStep,
+            float: tslFloat,
+          }),
+          type: "float",
+        },
+      };
+    }
+    if (kind === "audio") {
+      const uniforms = audioUniforms();
+      return {
+        bass: { value: uniforms.bass, type: "float" },
+        mid: { value: uniforms.mid, type: "float" },
+        high: { value: uniforms.high, type: "float" },
+        level: { value: uniforms.level, type: "float" },
       };
     }
     if (kind === "material") {

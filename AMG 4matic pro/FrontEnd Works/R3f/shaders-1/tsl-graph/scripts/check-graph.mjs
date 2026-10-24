@@ -1,6 +1,9 @@
 import { createNode } from "../src/graph/catalog.js";
+import { compileGraph } from "../src/graph/compiler.js";
+import { DEMOS } from "../src/graph/demos.js";
 import { createExampleGraph } from "../src/graph/exampleGraph.js";
 import { exportGraph } from "../src/graph/exportCode.js";
+import { parseFormula } from "../src/graph/formula.js";
 import { sanitizeGraph } from "../src/graph/storage.js";
 import { explainGraph, mergeTypes, validateConnection } from "../src/graph/types.js";
 
@@ -20,6 +23,47 @@ assert(code.includes("sin("), "export should include sin");
 assert(code.includes('color("#ff7a3c")'), "export should include the example color");
 assert(!code.includes("eval("), "export must not eval");
 assert(code.includes("export function createMaterial()"), "export should declare createMaterial");
+
+for (const demo of DEMOS) {
+  const graph = demo.build();
+  assert(explainGraph(graph.nodes, graph.edges) === null, `${demo.id} should type-check`);
+  const compiled = compileGraph(graph.nodes, graph.edges);
+  assert(compiled.slots.colorNode, `${demo.id} should compile a color`);
+  const exported = exportGraph(graph.nodes, graph.edges);
+  assert(!exported.includes("eval("), `${demo.id} export must not eval`);
+  assert(!exported.includes("Function("), `${demo.id} export must not build a Function`);
+  assert(!exported.includes("new Function"), `${demo.id} export must not build a Function`);
+  if (demo.id === "fourier") {
+    assert(exported.includes("sin("), "fourier export should unroll sin");
+    assert(exported.includes("float(1)"), "fourier export should include harmonic weights");
+  }
+  if (demo.id === "formula") {
+    assert(exported.includes("sin("), "formula export should call sin");
+    assert(exported.includes("uv().x"), "formula export should read uv.x");
+    assert(exported.includes("cos("), "formula export should call cos");
+  }
+  if (demo.id === "audio") {
+    assert(exported.includes("uniform(0)"), "audio export should declare uniforms");
+    assert(exported.includes("createAudioDriver"), "audio export should include a driver");
+    assert(exported.includes("audioBass"), "audio export should read the bass uniform");
+  }
+  if (demo.id === "curve") {
+    assert(exported.includes("step("), "curve export should sample with step");
+    assert(exported.includes("mix("), "curve export should interpolate with mix");
+  }
+}
+
+const formula = parseFormula("sin(uv.x * 10.0 + time)");
+assert(formula.type === "call" && formula.name === "sin", "formula parser should build a sin call");
+for (const bad of ["eval(1)", "Function('return 1')", "alert(1)", "uv.z + 1"]) {
+  let threw = false;
+  try {
+    parseFormula(bad);
+  } catch (error) {
+    threw = error instanceof Error && String(error.message).startsWith("Formula:");
+  }
+  assert(threw, `${bad} should be rejected by the parser`);
+}
 
 assert(mergeTypes("float", "vec3") === "vec3", "float should promote into vec3");
 assert(mergeTypes("float", "color") === "color", "float should promote into color");
@@ -112,6 +156,13 @@ for (const name of [
   "max",
   "mx_noise_float",
   "texture",
+  "cos",
+  "tan",
+  "sqrt",
+  "floor",
+  "ceil",
+  "step",
+  "uniform",
 ]) {
   assert(tsl[name] !== undefined, `three/tsl is missing ${name}`);
 }

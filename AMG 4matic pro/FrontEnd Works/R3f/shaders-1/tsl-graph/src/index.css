@@ -6,9 +6,10 @@ body,
 }
 
 body {
-  background: #12141a;
-  color: #e7e9ee;
+  background: #0c0e13;
+  color: #e8ebf2;
   font-family: "Segoe UI", system-ui, sans-serif;
+  letter-spacing: 0.01em;
 }
 
 button,
@@ -20,11 +21,19 @@ textarea {
 }
 
 button {
-  background: #2a3140;
-  border: 1px solid #465066;
-  border-radius: 6px;
-  padding: 6px 10px;
+  background: #232a38;
+  border: 1px solid #3d4658;
+  border-radius: 8px;
+  padding: 7px 11px;
   cursor: pointer;
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #8eb4ff;
+  outline-offset: 2px;
 }
 
 button:hover {
@@ -41,11 +50,11 @@ button:hover {
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-height: 52px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #2c3342;
-  background: #181c24;
+  gap: 8px;
+  min-height: 56px;
+  padding: 8px 14px;
+  border-bottom: 1px solid #262c38;
+  background: #12161e;
 }
 
 .brand {
@@ -101,14 +110,14 @@ button:hover {
 }
 
 .palette {
-  width: 228px;
+  width: 248px;
   flex: none;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px;
-  border-right: 1px solid #2c3342;
-  background: #161a21;
+  padding: 12px;
+  border-right: 1px solid #262c38;
+  background: #12161e;
   min-height: 0;
 }
 
@@ -165,20 +174,29 @@ button:hover {
   background: #14181f;
 }
 
+.stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+
 .side {
-  width: 420px;
+  width: min(480px, 40vw);
   flex: none;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-left: 1px solid #2c3342;
+  border-left: 1px solid #262c38;
+  background: #10141b;
 }
 
 .preview {
   position: relative;
-  flex: 1;
-  min-height: 240px;
-  background: #101319;
+  flex: 1.35;
+  min-height: 280px;
+  background: #0e1117;
 }
 
 .preview-canvas,
@@ -223,11 +241,12 @@ button:hover {
 }
 
 .inspector {
-  height: 270px;
+  flex: 0.85;
+  min-height: 240px;
   overflow: auto;
-  padding: 12px;
-  background: #181c24;
-  border-top: 1px solid #2c3342;
+  padding: 14px 14px 18px;
+  background: #141922;
+  border-top: 1px solid #262c38;
 }
 
 .inspector h2 {
@@ -381,4 +400,252 @@ button:hover {
   padding: 10px;
   font-family: Consolas, ui-monospace, monospace;
   font-size: 12px;
+}
+
+.toolbar {
+  flex-wrap: wrap;
+}
+
+.notice {
+  flex: 1;
+  min-width: 140px;
+}
+
+.library-head,
+.menu,
+.tutorial-actions,
+.audio-actions,
+.modal-card header div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.library-head {
+  justify-content: space-between;
+  font-size: 13px;
+}
+
+.library-head span {
+  color: #8ea0b8;
+  font-size: 11px;
+  border: 1px solid #323948;
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+
+.library-group h2 {
+  margin: 10px 0 6px;
+  color: #8ea0b8;
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.library-note {
+  margin: 0;
+  color: #9aabbe;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.palette-list button {
+  width: 100%;
+  background: #1b212c;
+}
+
+.palette-list button:hover,
+.command button:hover,
+.command button.active,
+.menu-pop button:hover {
+  background: #2a3446;
+  border-color: #6e8ec4;
+}
+
+.menu {
+  position: relative;
+}
+
+.menu-pop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 12;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  padding: 6px;
+  background: #1a202b;
+  border: 1px solid #3a4456;
+  border-radius: 10px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+}
+
+.menu-pop button {
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+}
+
+.field textarea,
+.field select,
+.command input {
+  width: 100%;
+  box-sizing: border-box;
+  background: #10141b;
+  border: 1px solid #3a4252;
+  border-radius: 8px;
+  padding: 8px;
+}
+
+.field textarea {
+  resize: vertical;
+  min-height: 72px;
+  font-family: Consolas, ui-monospace, monospace;
+  font-size: 12px;
+}
+
+.formula-error {
+  margin: 4px 0 0;
+  color: #ff9b9b;
+  font-size: 12px;
+}
+
+.curve-editor {
+  width: 100%;
+  height: 150px;
+  background: #10141c;
+  border: 1px solid #343c4c;
+  border-radius: 10px;
+  touch-action: none;
+}
+
+.curve-bg {
+  fill: #10141c;
+}
+
+.curve-line {
+  fill: none;
+  stroke: #f0c14d;
+  stroke-width: 1.6;
+}
+
+.curve-editor circle {
+  fill: #f7f4ea;
+  stroke: #0e1116;
+  stroke-width: 0.6;
+  cursor: grab;
+}
+
+.audio-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.audio-meters {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 10px;
+  margin: 0;
+  color: #c5d0e0;
+  font-size: 12px;
+}
+
+.audio-panel canvas {
+  width: 100%;
+  height: 84px;
+  border-radius: 8px;
+  background: #10141c;
+}
+
+.tutorial {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 8;
+  width: min(360px, calc(100% - 32px));
+  padding: 14px 14px 12px;
+  background: #1a212d;
+  border: 1px solid #465572;
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.4);
+}
+
+.tutorial h2 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.tutorial p {
+  margin: 0;
+  color: #c9d3e2;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.tutorial-kicker {
+  margin-bottom: 4px !important;
+  color: #8eb4ff !important;
+  font-size: 11px !important;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tutorial-actions {
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.tutorial-actions button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.command-modal {
+  align-items: flex-start;
+  padding-top: 12vh;
+}
+
+.command {
+  width: min(520px, 92vw);
+  padding: 10px;
+  background: #171d27;
+  border: 1px solid #3c475c;
+  border-radius: 14px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.45);
+}
+
+.command ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.command button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  text-align: left;
+  background: transparent;
+  border-color: transparent;
+}
+
+.command small,
+.palette-list small {
+  color: #93a0b5;
+}
+
+.react-flow__connection-path,
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__handle:hover {
+  box-shadow: 0 0 0 4px rgba(142, 180, 255, 0.28);
 }

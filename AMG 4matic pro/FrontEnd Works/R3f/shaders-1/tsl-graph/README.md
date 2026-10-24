@@ -23,14 +23,25 @@ npm run check
 
 ## Authoring
 
-- Add nodes from the search list. Drag between the colored sockets. A float may feed a vec2, vec3, or color input. Mismatched vectors are refused.
+- Add nodes from the grouped library or with Ctrl+K / Cmd+K. Drag between the colored sockets. A float may feed a vec2, vec3, or color input. Mismatched vectors are refused.
 - Click a node and edit its constants. The preview material rebuilds.
 - Delete with the inspector button, Backspace, or Delete. The Material node stays.
-- Export copies a `createMaterial()` function. Paste it into a WebGPU Three.js app.
-- The graph is stored in `localStorage` under `tsl-graph.v1`. Reset example replaces it with the animated starter.
+- Demos replace the graph with a starter, a Fourier pattern, a formula plasma, an audio-reactive material, or a curve ramp.
+- The tutorial opens on the first visit and again from Tutorial. It asks you to add a node, connect it, edit a constant, and export.
+- Copy export or Download .js writes a `createMaterial()` function. Paste it into a WebGPU Three.js app. Formula text is parsed into TSL calls. Nothing is passed to `eval`.
+- Audio uses the microphone when you allow it. If permission is missing or denied, use the test tone so the material still moves.
+- The graph is stored in `localStorage` under `tsl-graph.v1`. Reset replaces it with the animated starter.
 
 The starter graph scrolls Perlin noise across UV, mixes two colors, pulses emissive with `sin(time)`, and varies roughness. Metalness is high so the sunset environment and the lights show up on the mesh.
 
 ## Nodes
 
-UV, Position, Normal, Time, Float, Color, Vec3, Add, Subtract, Multiply, Divide, Mix, Clamp, Smoothstep, Sin, Abs, Power, Fract, Min, Max, Split, Combine, Noise (`mx_noise_float`), Texture (`texture()`), and the fixed Material output (color, roughness, metalness, emissive, opacity).
+Input: UV, Position, Normal, Time, Float, Color, Vec3.
+
+Math: Add, Subtract, Multiply, Divide, Mix, Clamp, Smoothstep, Sin, Abs, Power, Fract, Min, Max, Split, Combine.
+
+Pattern: Noise (`mx_noise_float`), Texture (`texture()`), Fourier (sine, square, or saw series), Formula (a small expression compiled through a parser), Curve (a draggable 0–1 ramp).
+
+Audio: bass, mid, high, and level from an `AnalyserNode`, or from the built-in test tone.
+
+Output: the fixed Material node (color, roughness, metalness, emissive, opacity).

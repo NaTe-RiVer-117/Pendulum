@@ -13,11 +13,12 @@ function node(label, category, inputs, outputs, extra = {}) {
   };
 }
 
-const numberField = (key, label) => ({
+const numberField = (key, label, step = 0.01, extra = {}) => ({
   key,
   label,
   control: "number",
-  step: 0.01,
+  step,
+  ...extra,
 });
 
 export const CATALOG = {
@@ -33,15 +34,15 @@ export const CATALOG = {
   time: node("Time", "Input", [], [output("out", "Time")], {
     blurb: "time",
   }),
-  float: node("Float", "Constant", [], [output("out", "Value")], {
+  float: node("Float", "Input", [], [output("out", "Value")], {
     defaults: { value: 1 },
     fields: [numberField("value", "Value")],
   }),
-  color: node("Color", "Constant", [], [output("out", "Color")], {
+  color: node("Color", "Input", [], [output("out", "Color")], {
     defaults: { value: "#ffffff" },
     fields: [{ key: "value", label: "Color", control: "color" }],
   }),
-  vec3: node("Vec3", "Constant", [], [output("out", "Vector")], {
+  vec3: node("Vec3", "Input", [], [output("out", "Vector")], {
     defaults: { x: 0, y: 0, z: 0 },
     fields: [numberField("x", "X"), numberField("y", "Y"), numberField("z", "Z")],
   }),
@@ -95,14 +96,14 @@ export const CATALOG = {
   max: node("Max", "Math", [input("a", "A"), input("b", "B")], [output("out", "Out")]),
   split: node(
     "Split",
-    "Convert",
+    "Math",
     [input("in", "In")],
     [output("x", "X"), output("y", "Y"), output("z", "Z")],
     { blurb: "x / y / z" },
   ),
   combine: node(
     "Combine",
-    "Convert",
+    "Math",
     [input("x", "X"), input("y", "Y"), input("z", "Z")],
     [output("out", "Vec3")],
     { blurb: "vec3(x, y, z)" },
@@ -123,6 +124,54 @@ export const CATALOG = {
       fields: [{ key: "src", label: "Image", control: "image" }],
     },
   ),
+  fourier: node("Fourier", "Pattern", [input("t", "Time")], [output("out", "Wave")], {
+    blurb: "Harmonic series",
+    defaults: { harmonics: 4, frequency: 1, falloff: 1, waveform: "sine" },
+    fields: [
+      numberField("harmonics", "Harmonics", 1, { min: 1, max: 12 }),
+      numberField("frequency", "Frequency"),
+      numberField("falloff", "Falloff", 0.01, { min: 0, max: 4 }),
+      {
+        key: "waveform",
+        label: "Waveform",
+        control: "select",
+        options: [
+          { value: "sine", label: "Sine" },
+          { value: "square", label: "Square" },
+          { value: "saw", label: "Saw" },
+        ],
+      },
+    ],
+  }),
+  formula: node("Formula", "Pattern", [], [output("out", "Value")], {
+    blurb: "Expression compiled to TSL",
+    defaults: { expr: "sin(uv.x * 10.0 + time)" },
+    fields: [{ key: "expr", label: "Expression", control: "text" }],
+  }),
+  curve: node("Curve", "Pattern", [input("t", "Sample")], [output("out", "Value")], {
+    blurb: "Shape a 0–1 ramp",
+    defaults: {
+      points: [
+        { x: 0, y: 0 },
+        { x: 0.35, y: 0.12 },
+        { x: 0.62, y: 0.88 },
+        { x: 1, y: 1 },
+      ],
+    },
+    fields: [{ key: "points", label: "Curve", control: "curve" }],
+  }),
+  audio: node(
+    "Audio",
+    "Audio",
+    [],
+    [
+      output("bass", "Bass"),
+      output("mid", "Mid"),
+      output("high", "High"),
+      output("level", "Level"),
+    ],
+    { blurb: "Microphone bands" },
+  ),
   material: node(
     "Material",
     "Output",
@@ -138,32 +187,42 @@ export const CATALOG = {
   ),
 };
 
-export const PALETTE_KINDS = [
-  "uv",
-  "position",
-  "normal",
-  "time",
-  "float",
-  "color",
-  "vec3",
-  "add",
-  "subtract",
-  "multiply",
-  "divide",
-  "mix",
-  "clamp",
-  "smoothstep",
-  "sin",
-  "abs",
-  "power",
-  "fract",
-  "min",
-  "max",
-  "split",
-  "combine",
-  "noise",
-  "texture",
+export const LIBRARY_GROUPS = [
+  {
+    id: "Input",
+    kinds: ["uv", "position", "normal", "time", "float", "color", "vec3"],
+  },
+  {
+    id: "Math",
+    kinds: [
+      "add",
+      "subtract",
+      "multiply",
+      "divide",
+      "mix",
+      "clamp",
+      "smoothstep",
+      "sin",
+      "abs",
+      "power",
+      "fract",
+      "min",
+      "max",
+      "split",
+      "combine",
+    ],
+  },
+  {
+    id: "Pattern",
+    kinds: ["noise", "texture", "fourier", "formula", "curve"],
+  },
+  { id: "Audio", kinds: ["audio"] },
+  { id: "Output", kinds: ["material"] },
 ];
+
+export const PALETTE_KINDS = LIBRARY_GROUPS.flatMap((group) => group.kinds).filter(
+  (kind) => kind !== "material",
+);
 
 export const INPUT_DEFAULTS = {
   mix: { t: 0.5 },
@@ -180,6 +239,12 @@ export const INPUT_DEFAULTS = {
   },
 };
 
+function cloneValues(values) {
+  const next = { ...values };
+  if (Array.isArray(next.points)) next.points = next.points.map((point) => ({ ...point }));
+  return next;
+}
+
 export function createNode(kind, id, position, values = {}) {
   const def = CATALOG[kind];
   if (!def) throw new Error(`Unknown node kind ${kind}`);
@@ -190,7 +255,7 @@ export function createNode(kind, id, position, values = {}) {
     deletable: kind !== "material",
     data: {
       kind,
-      values: { ...def.defaults, ...values },
+      values: cloneValues({ ...def.defaults, ...values }),
     },
   };
 }

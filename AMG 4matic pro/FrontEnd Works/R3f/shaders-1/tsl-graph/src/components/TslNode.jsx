@@ -10,11 +10,21 @@ function restingInput(kind, inputId) {
   if (kind === "combine") return "float";
   if (kind === "split" || kind === "noise") return "vec3";
   if (kind === "texture") return "vec2";
+  if (kind === "fourier" || kind === "curve") return "float";
   return "float";
 }
 
 function previewValue(field, values) {
   if (field.control === "image") return values?.src ? "image" : "checker";
+  if (field.control === "text") {
+    const text = String(values?.expr ?? "");
+    return text.length > 32 ? `${text.slice(0, 32)}…` : text;
+  }
+  if (field.control === "curve") {
+    const count = Array.isArray(values?.points) ? values.points.length : 0;
+    return `${count} pts`;
+  }
+  if (field.control === "select") return values?.[field.key] ?? "";
   const value = values?.[field.key];
   if (typeof value === "number") return String(Math.round(value * 1000) / 1000);
   return value ?? "";

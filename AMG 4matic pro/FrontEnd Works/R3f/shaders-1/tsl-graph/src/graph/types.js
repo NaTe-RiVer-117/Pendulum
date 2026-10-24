@@ -117,7 +117,10 @@ export function analyze(nodes, edges) {
     }
     if (kind === "color") return "color";
     if (kind === "split") return "float";
-    if (kind === "noise") return "float";
+    if (kind === "noise" || kind === "fourier" || kind === "formula" || kind === "curve") {
+      return "float";
+    }
+    if (kind === "audio") return "float";
     if (kind === "texture") return handle === "a" ? "float" : "color";
     if (kind === "material") return "error";
     if (UNARY.has(kind)) return connectedType(nodeId, "in") || "float";
@@ -210,6 +213,10 @@ function inputTypeError(kind, inputId, typeOf) {
     return sourceType === "vec2" || sourceType === "float"
       ? null
       : "Texture UV needs a vec2. A float can promote into it.";
+  }
+
+  if (kind === "fourier" || kind === "curve") {
+    return sourceType === "float" ? null : "This input needs a float.";
   }
 
   if (UNARY.has(kind)) {
