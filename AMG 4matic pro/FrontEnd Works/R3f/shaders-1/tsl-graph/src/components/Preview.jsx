@@ -1,6 +1,6 @@
 import { Environment, OrbitControls } from "@react-three/drei";
 import { Canvas, extend, useFrame } from "@react-three/fiber";
-import { Component, Suspense, useCallback, useRef, useState } from "react";
+import { Component, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import * as THREE from "three/webgpu";
 import { tickAudio } from "../audio/driver.js";
 
@@ -62,7 +62,7 @@ function PreviewMesh({ shown, shownKey, primitive }) {
   );
 }
 
-export function Preview({ compiled, materialKey, primitive }) {
+export function Preview({ compiled, materialKey, primitive, onStatus }) {
   const [frameloop, setFrameloop] = useState("never");
   const [backend, setBackend] = useState("starting");
   const [backendDetail, setBackendDetail] = useState("");
@@ -111,19 +111,15 @@ export function Preview({ compiled, materialKey, primitive }) {
           ? "WebGL fallback"
           : backendDetail || "WebGPU init failed";
 
+  useEffect(() => {
+    onStatus?.(status);
+  }, [onStatus, status]);
+
   return (
     <div className="preview" data-testid="preview-stage" data-material-key={goodKey.current} data-backend={backend}>
-      <div className="preview-status" data-testid="preview-status">
-        {status}
-      </div>
       <div className="frame-count" data-testid="frame-count">
         {frames}
       </div>
-      {!compiled.ok && (
-        <div className="preview-error" data-testid="preview-error">
-          {compiled.error}
-        </div>
-      )}
       <Canvas
         className="preview-canvas"
         camera={{ position: [2.6, 1.45, 3.5], fov: 40 }}
@@ -131,7 +127,7 @@ export function Preview({ compiled, materialKey, primitive }) {
         dpr={[1, 1.5]}
         gl={gl}
       >
-        <color attach="background" args={["#12141a"]} />
+        <color attach="background" args={["#07080a"]} />
         <ambientLight intensity={0.28} />
         <directionalLight position={[4.5, 6, 3]} intensity={2.6} />
         <directionalLight position={[-4, 1.6, -2]} intensity={0.55} color="#9ec5ff" />

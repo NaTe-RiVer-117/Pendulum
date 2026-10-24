@@ -4,16 +4,14 @@ import { ensureShaderMotion } from "./audio/driver.js";
 import { CommandPalette } from "./components/CommandPalette.jsx";
 import { GraphCanvas } from "./components/GraphCanvas.jsx";
 import { Inspector } from "./components/Inspector.jsx";
-import { Palette } from "./components/Palette.jsx";
-import { PresetShelf, TweakBar } from "./components/PresetShelf.jsx";
 import { Preview } from "./components/Preview.jsx";
 import { Tutorial, tutorialSeen } from "./components/Tutorial.jsx";
 import { createNode } from "./graph/catalog.js";
 import { compileGraph } from "./graph/compiler.js";
-import { PRESETS } from "./graph/demos.js";
 import { createExampleGraph } from "./graph/exampleGraph.js";
 import { exportGraph } from "./graph/exportCode.js";
 import { loadGraph, saveGraph } from "./graph/storage.js";
+import { PRESETS } from "./presets/index.js";
 
 function hashString(text) {
   let hash = 2166136261;
@@ -22,6 +20,35 @@ function hashString(text) {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0).toString(16);
+}
+
+function presetControls(nodes) {
+  const has = (id) => nodes.some((node) => node.id === id);
+  const controls = [];
+  if (has("speed")) {
+    controls.push({ id: "speed", label: "Speed", nodeId: "speed", key: "value", min: 0, max: 3, step: 0.01 });
+  }
+  if (has("colorA")) {
+    controls.push({ id: "colorA", label: "Color A", nodeId: "colorA", key: "value", control: "color" });
+  }
+  if (has("colorB")) {
+    controls.push({ id: "colorB", label: "Color B", nodeId: "colorB", key: "value", control: "color" });
+  }
+  if (has("gain")) {
+    controls.push({ id: "intensity", label: "Intensity", nodeId: "gain", key: "value", min: 0, max: 2, step: 0.01 });
+  }
+  if (has("fourier")) {
+    controls.push({
+      id: "harmonics",
+      label: "Harmonics",
+      nodeId: "fourier",
+      key: "harmonics",
+      min: 1,
+      max: 12,
+      step: 1,
+    });
+  }
+  return controls;
 }
 
 function Shell() {
@@ -39,11 +66,14 @@ function Shell() {
   const [tutorialOpen, setTutorialOpen] = useState(() => !tutorialSeen());
   const [tutorialSession, setTutorialSession] = useState(0);
   const [activePreset, setActivePreset] = useState(null);
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
-  const [workspaceTab, setWorkspaceTab] = useState("graph");
+  const [tab, setTab] = useState("presets");
+  const [menuOpen, setMenuOpen] = useState(false);
   const [graphOpens, setGraphOpens] = useState(0);
+  const [backendLabel, setBackendLabel] = useState("Starting WebGPU…");
   const { screenToFlowPosition } = useReactFlow();
   const preset = PRESETS.find((item) => item.id === activePreset) ?? null;
+  const controls = presetControls(nodes);
+  const onStatus = useCallback((label) => setBackendLabel(label), []);
 
   useEffect(() => {
     const result = saveGraph({ nodes, edges });
@@ -54,6 +84,15 @@ function Shell() {
   useEffect(() => {
     if (hasAudio) ensureShaderMotion();
   }, [hasAudio]);
+
+  useEffect(() => {
+    if (!menuOpen) return undefined;
+    function onPointer(event) {
+      if (!event.target.closest?.(".quiet")) setMenuOpen(false);
+    }
+    window.addEventListener("pointerdown", onPointer);
+    return () => window.removeEventListener("pointerdown", onPointer);
+  }, [menuOpen]);
 
   useEffect(() => {
     function onKey(event) {
@@ -137,36 +176,39 @@ function Shell() {
     position.y += Math.round((Math.random() - 0.5) * 36);
     const id = `${kind}-${crypto.randomUUID().slice(0, 8)}`;
     setNodes((current) => current.concat(createNode(kind, id, position)));
-    openWorkspace("graph");
+    showGraph();
     setNotice(`${kind} added.`);
   }
 
-  function loadGraphState(next, message, presetId = null) {
+  function loadGraphState(next, presetId = null) {
     setNodes(next.nodes);
     setEdges(next.edges);
     setActivePreset(presetId);
     setFitToken((token) => token + 1);
     setExportOpen(false);
-    setNotice(message);
+    setNotice("");
   }
 
   function loadPreset(nextPreset) {
-    loadGraphState(nextPreset.build(), `${nextPreset.name} loaded.`, nextPreset.id);
+    loadGraphState(nextPreset.buildGraph(), nextPreset.id);
   }
 
-  function openWorkspace(tab = "graph") {
-    setWorkspaceTab(tab);
-    setWorkspaceOpen(true);
+  function showGraph() {
+    setTab("graph");
+    setMenuOpen(false);
     setGraphOpens((count) => count + 1);
     setFitToken((token) => token + 1);
   }
 
   function openTutorial() {
+    setMenuOpen(false);
     setTutorialSession((session) => session + 1);
     setTutorialOpen(true);
+    setTab("presets");
   }
 
   async function copyExport() {
+    setMenuOpen(false);
     try {
       const code = exportGraph(nodes, edges);
       setExportText(code);
@@ -176,7 +218,7 @@ function Shell() {
         await navigator.clipboard.writeText(code);
         setNotice("Export copied.");
       } catch {
-        setNotice("Export is ready in the panel.");
+        setNotice("Export is ready.");
       }
     } catch (error) {
       setNotice(error?.message || "Export failed.");
@@ -184,6 +226,7 @@ function Shell() {
   }
 
   function downloadExport() {
+    setMenuOpen(false);
     try {
       const code = exportGraph(nodes, edges);
       const blob = new Blob([code], { type: "text/javascript" });
@@ -205,101 +248,174 @@ function Shell() {
   }
 
   return (
-    <div className={`app${workspaceOpen ? " workspace-open" : ""}`}>
-      <header className="topbar">
-        <div className="brand">
-          <strong>TSL Graph</strong>
-          <span>Shader studio</span>
+    <div className="app">
+      <section className="stage">
+        <Preview
+          compiled={compiled}
+          materialKey={materialKey}
+          primitive={primitive}
+          onStatus={onStatus}
+        />
+        <div className="caption">
+          <h1 data-testid="preset-name">{preset ? preset.name : "Shader"}</h1>
+          <div className="caption-meta">
+            <span data-testid="preview-status">{backendLabel}</span>
+            <label>
+              Mesh
+              <select
+                data-testid="primitive"
+                value={primitive}
+                onChange={(event) => setPrimitive(event.target.value)}
+              >
+                <option value="sphere">Sphere</option>
+                <option value="box">Box</option>
+                <option value="torus">Torus</option>
+                <option value="knot">Torus knot</option>
+              </select>
+            </label>
+          </div>
         </div>
-        <div className="top-actions">
-          <label className="primitive">
-            Mesh
-            <select
-              data-testid="primitive"
-              value={primitive}
-              onChange={(event) => setPrimitive(event.target.value)}
+      </section>
+      <aside className="side" data-tab={tab}>
+        <header className="side-head">
+          <div className="switch" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              data-testid="panel-presets"
+              className={tab === "presets" ? "active" : ""}
+              aria-selected={tab === "presets"}
+              onClick={() => setTab("presets")}
             >
-              <option value="sphere">Sphere</option>
-              <option value="box">Box</option>
-              <option value="torus">Torus</option>
-              <option value="knot">Torus knot</option>
-            </select>
-          </label>
-          <button type="button" data-testid="open-graph" onClick={() => openWorkspace("graph")}>
-            Graph
-          </button>
-          <button type="button" data-testid="open-library" onClick={() => openWorkspace("library")}>
-            Library
-          </button>
-          <button type="button" data-testid="open-inspector" onClick={() => openWorkspace("inspector")}>
-            Inspector
-          </button>
-          <button type="button" data-testid="tutorial-open" onClick={openTutorial}>
-            Tutorial
-          </button>
-          <button type="button" data-testid="export" onClick={copyExport}>
-            Copy export
-          </button>
-          <button type="button" data-testid="download" onClick={downloadExport}>
-            Download .js
-          </button>
-        </div>
-      </header>
-      <div className="stage">
-        <section className="hero">
-          <Preview compiled={compiled} materialKey={materialKey} primitive={primitive} />
-          <TweakBar preset={preset} nodes={nodes} onChange={updateValue} />
-          {notice && (
-            <p className="toast" data-testid="notice">
-              {notice}
-            </p>
-          )}
-          {!compiled.ok && (
-            <p className="compile-error hero-error" data-testid="compile-error">
-              {compiled.error}
-            </p>
-          )}
-        </section>
-        <PresetShelf presets={PRESETS} activeId={activePreset} onPick={loadPreset} />
-        <section
-          className={`workspace${workspaceOpen ? " open" : ""}`}
-          data-testid="workspace"
-          data-open={workspaceOpen ? "true" : "false"}
-          hidden={!workspaceOpen}
-        >
-          <header className="workspace-bar">
-            <div className="workspace-tabs" role="tablist">
-              <button
-                type="button"
-                data-testid="tab-library"
-                className={workspaceTab === "library" ? "active" : ""}
-                onClick={() => setWorkspaceTab("library")}
-              >
-                Library
-              </button>
-              <button
-                type="button"
-                data-testid="tab-graph"
-                className={workspaceTab === "graph" ? "active" : ""}
-                onClick={() => setWorkspaceTab("graph")}
-              >
-                Graph
-              </button>
-              <button
-                type="button"
-                data-testid="tab-inspector"
-                className={workspaceTab === "inspector" ? "active" : ""}
-                onClick={() => setWorkspaceTab("inspector")}
-              >
-                Inspector
-              </button>
-            </div>
-            <button type="button" data-testid="close-workspace" onClick={() => setWorkspaceOpen(false)}>
-              Close
+              Presets
             </button>
-          </header>
-          <div className="workspace-body" data-tab={workspaceTab}>
-            <Palette onAdd={addKind} />
+            <button
+              type="button"
+              role="tab"
+              data-testid="panel-graph"
+              className={tab === "graph" ? "active" : ""}
+              aria-selected={tab === "graph"}
+              onClick={showGraph}
+            >
+              Graph
+            </button>
+          </div>
+          <div className="quiet">
+            <button
+              type="button"
+              data-testid="menu"
+              aria-expanded={menuOpen}
+              onClick={() => setMenuOpen((open) => !open)}
+            >
+              Export
+            </button>
+            {menuOpen && (
+              <div className="quiet-menu" role="menu">
+                <button type="button" data-testid="export" onClick={copyExport}>
+                  Copy export
+                </button>
+                <button type="button" data-testid="download" onClick={downloadExport}>
+                  Download material.js
+                </button>
+                <button type="button" data-testid="tutorial-open" onClick={openTutorial}>
+                  Tutorial
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setCommandOpen(true);
+                  }}
+                >
+                  Add node
+                </button>
+              </div>
+            )}
+          </div>
+        </header>
+        {notice && (
+          <p className="note" data-testid="notice">
+            {notice}
+          </p>
+        )}
+        {!compiled.ok && (
+          <p className="note warn" data-testid="compile-error">
+            {compiled.error}
+          </p>
+        )}
+        {tutorialOpen && (
+          <Tutorial
+            key={tutorialSession}
+            activePreset={activePreset}
+            tweakSignal={tweakSignal}
+            graphOpens={graphOpens}
+            exportSignal={exportSignal}
+            onClose={() => setTutorialOpen(false)}
+          />
+        )}
+        {tab === "presets" ? (
+          <div className="preset-pane" data-testid="presets">
+            {preset ? (
+              <div className="tweaks" data-testid="tweaks">
+                {controls.map((control) => {
+                  const node = nodes.find((item) => item.id === control.nodeId);
+                  const value = node?.data?.values?.[control.key];
+                  if (control.control === "color") {
+                    const color = typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value) ? value : "#ffffff";
+                    return (
+                      <label key={control.id}>
+                        {control.label}
+                        <input
+                          type="color"
+                          data-testid={`tweak-${control.id}`}
+                          value={color}
+                          onChange={(event) => updateValue(control.nodeId, control.key, event.target.value)}
+                        />
+                      </label>
+                    );
+                  }
+                  const number = Number(value);
+                  return (
+                    <label key={control.id}>
+                      {control.label}
+                      <input
+                        type="range"
+                        data-testid={`tweak-${control.id}`}
+                        min={control.min}
+                        max={control.max}
+                        step={control.step}
+                        value={Number.isFinite(number) ? number : control.min}
+                        onChange={(event) => {
+                          const next = Number(event.target.value);
+                          updateValue(control.nodeId, control.key, control.step === 1 ? Math.round(next) : next);
+                        }}
+                      />
+                    </label>
+                  );
+                })}
+              </div>
+            ) : (
+              <p className="lead">Choose a shader. Speed, color, and intensity edit the same nodes as the graph.</p>
+            )}
+            <ul className="preset-list">
+              {PRESETS.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    data-testid={`preset-${item.id}`}
+                    className={item.id === activePreset ? "active" : ""}
+                    onClick={() => loadPreset(item)}
+                  >
+                    <img src={item.thumbnail} alt="" />
+                    <strong>{item.name}</strong>
+                    <span>{item.description}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : (
+          <div className="graph-pane">
             <GraphCanvas
               nodes={nodes}
               edges={edges}
@@ -309,53 +425,37 @@ function Shell() {
               onNotice={onNotice}
               fitToken={fitToken}
             />
-            <Inspector
-              selected={selected}
-              onChange={updateValue}
-              onDelete={deleteNode}
-              onNotice={onNotice}
-            />
+            {selected.length === 1 && (
+              <Inspector
+                selected={selected}
+                onChange={updateValue}
+                onDelete={deleteNode}
+                onNotice={onNotice}
+              />
+            )}
           </div>
-        </section>
-      </div>
-      {tutorialOpen && (
-        <Tutorial
-          key={tutorialSession}
-          activePreset={activePreset}
-          tweakSignal={tweakSignal}
-          graphOpens={graphOpens}
-          exportSignal={exportSignal}
-          onClose={() => setTutorialOpen(false)}
-        />
-      )}
+        )}
+      </aside>
       <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} onAdd={addKind} />
       {exportOpen && (
         <div className="modal" role="dialog" aria-label="Exported TSL">
           <div className="modal-card">
             <header>
-              <strong>three/tsl export</strong>
-              <div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard?.writeText(exportText).then(
-                      () => setNotice("Export copied."),
-                      () => setNotice("Clipboard was blocked. Copy from the panel."),
-                    );
-                  }}
-                >
-                  Copy
-                </button>
-                <button type="button" onClick={() => setExportOpen(false)}>
-                  Close
-                </button>
-              </div>
+              <strong>three/tsl</strong>
+              <button type="button" onClick={() => setExportOpen(false)}>
+                Close
+              </button>
             </header>
             <textarea data-testid="export-code" readOnly value={exportText} />
           </div>
         </div>
       )}
-      <button type="button" className="sr-reset" data-testid="reset" onClick={() => loadGraphState(createExampleGraph(), "Example graph restored.")}>
+      <button
+        type="button"
+        className="sr-reset"
+        data-testid="reset"
+        onClick={() => loadGraphState(createExampleGraph(), null)}
+      >
         Reset example
       </button>
     </div>

@@ -1,6 +1,6 @@
 import { createNode } from "../src/graph/catalog.js";
 import { compileGraph } from "../src/graph/compiler.js";
-import { DEMOS } from "../src/graph/demos.js";
+import { PRESETS } from "../src/presets/index.js";
 import { createExampleGraph } from "../src/graph/exampleGraph.js";
 import { exportGraph } from "../src/graph/exportCode.js";
 import { parseFormula } from "../src/graph/formula.js";
@@ -24,30 +24,30 @@ assert(code.includes('color("#ff7a3c")'), "export should include the example col
 assert(!code.includes("eval("), "export must not eval");
 assert(code.includes("export function createMaterial()"), "export should declare createMaterial");
 
-for (const demo of DEMOS) {
-  const graph = demo.build();
-  assert(explainGraph(graph.nodes, graph.edges) === null, `${demo.id} should type-check`);
+for (const preset of PRESETS) {
+  const graph = preset.buildGraph();
+  assert(explainGraph(graph.nodes, graph.edges) === null, `${preset.id} should type-check`);
   const compiled = compileGraph(graph.nodes, graph.edges);
-  assert(compiled.slots.colorNode, `${demo.id} should compile a color`);
+  assert(compiled.slots.colorNode, `${preset.id} should compile a color`);
   const exported = exportGraph(graph.nodes, graph.edges);
-  assert(!exported.includes("eval("), `${demo.id} export must not eval`);
-  assert(!exported.includes("Function("), `${demo.id} export must not build a Function`);
-  assert(!exported.includes("new Function"), `${demo.id} export must not build a Function`);
-  if (demo.id === "fourier") {
+  assert(!exported.includes("eval("), `${preset.id} export must not eval`);
+  assert(!exported.includes("Function("), `${preset.id} export must not build a Function`);
+  assert(!exported.includes("new Function"), `${preset.id} export must not build a Function`);
+  if (preset.id === "fourier") {
     assert(exported.includes("sin("), "fourier export should unroll sin");
     assert(exported.includes("float(1)"), "fourier export should include harmonic weights");
   }
-  if (demo.id === "formula") {
+  if (preset.id === "formula") {
     assert(exported.includes("sin("), "formula export should call sin");
     assert(exported.includes("uv().x"), "formula export should read uv.x");
     assert(exported.includes("cos("), "formula export should call cos");
   }
-  if (demo.id === "audio") {
+  if (preset.id === "audio") {
     assert(exported.includes("uniform(0)"), "audio export should declare uniforms");
     assert(exported.includes("createAudioDriver"), "audio export should include a driver");
     assert(exported.includes("audioBass"), "audio export should read the bass uniform");
   }
-  if (demo.id === "curve") {
+  if (preset.id === "curve") {
     assert(exported.includes("step("), "curve export should sample with step");
     assert(exported.includes("mix("), "curve export should interpolate with mix");
   }

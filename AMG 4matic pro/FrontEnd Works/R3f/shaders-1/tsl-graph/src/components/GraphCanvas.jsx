@@ -1,7 +1,6 @@
 import {
   Background,
   Controls,
-  MiniMap,
   ReactFlow,
   addEdge,
   useReactFlow,
@@ -199,9 +198,8 @@ export function GraphCanvas({
           }}
         >
           <FitView token={fitToken} />
-          <Background gap={18} color="#2a3140" />
-          <Controls />
-          <MiniMap pannable zoomable />
+          <Background gap={22} color="#24262c" />
+          <Controls showInteractive={false} />
         </ReactFlow>
       </div>
     </TypeContext.Provider>

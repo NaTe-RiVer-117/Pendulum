@@ -6,22 +6,22 @@ const STEPS = [
   {
     id: "preset",
     title: "Pick a preset",
-    body: "Choose a shader card. It loads a finished animated graph into the preview.",
+    body: "Choose a shader. Its image is a still of the material, and choosing it loads the graph.",
   },
   {
     id: "tweak",
     title: "Tweak it",
-    body: "Move speed, a color, or intensity. Those controls are real nodes, so the preview rebuilds.",
+    body: "Move speed, a color, or intensity in this panel. Those controls are the nodes themselves.",
   },
   {
     id: "graph",
     title: "Open the graph",
-    body: "Open the workspace to see the nodes behind the preset. Edit one and the same shader updates.",
+    body: "Switch to Graph. Edit a node and the same shader updates.",
   },
   {
     id: "export",
     title: "Export",
-    body: "Copy the TSL export or download material.js. It is three/tsl, not handwritten GLSL.",
+    body: "Open Export and copy the TSL, or download material.js.",
   },
 ];
 
