@@ -2,10 +2,10 @@ import { useMemo, useState } from "react";
 import { CATALOG, LIBRARY_GROUPS } from "../graph/catalog.js";
 import { TYPE_COLOR, VALUE_TYPES } from "../graph/types.js";
 
-export function Palette({ onAdd }) {
+export function Palette({ onAdd, presets, activePreset, onPreset }) {
   const [query, setQuery] = useState("");
+  const needle = query.trim().toLowerCase();
   const groups = useMemo(() => {
-    const needle = query.trim().toLowerCase();
     return LIBRARY_GROUPS.map((group) => ({
       ...group,
       kinds: group.kinds.filter((kind) => {
@@ -14,7 +14,10 @@ export function Palette({ onAdd }) {
         return haystack.includes(needle);
       }),
     })).filter((group) => group.kinds.length > 0);
-  }, [query]);
+  }, [needle]);
+  const presetRows = presets.filter((preset) =>
+    `${preset.name} ${preset.description} ${preset.id}`.toLowerCase().includes(needle),
+  );
 
   return (
     <aside className="palette">
@@ -53,7 +56,27 @@ export function Palette({ onAdd }) {
             })}
           </section>
         ))}
-        {groups.length === 0 && <p className="empty">No matching nodes.</p>}
+        {presetRows.length > 0 && (
+          <section className="library-group" data-testid="group-presets">
+            <h2>Presets</h2>
+            {presetRows.map((preset) => (
+              <button
+                key={preset.id}
+                type="button"
+                className={`preset-row${preset.id === activePreset ? " active" : ""}`}
+                data-testid={`preset-${preset.id}`}
+                onClick={() => onPreset(preset)}
+              >
+                <img src={preset.thumbnail} alt="" />
+                <span>
+                  <strong>{preset.name}</strong>
+                  <small>{preset.description}</small>
+                </span>
+              </button>
+            ))}
+          </section>
+        )}
+        {groups.length === 0 && presetRows.length === 0 && <p className="empty">No matching nodes.</p>}
       </div>
       <div className="legend">
         {VALUE_TYPES.map((type) => (

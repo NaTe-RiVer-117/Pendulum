@@ -35,8 +35,8 @@ function FitView({ token }) {
       const focus = material
         ? nodes.filter(
             (node) =>
-              Math.abs(node.position.x - material.position.x) < 820 &&
-              Math.abs(node.position.y - material.position.y) < 640,
+              Math.abs(node.position.x - material.position.x) < 1100 &&
+              Math.abs(node.position.y - material.position.y) < 720,
           )
         : nodes;
       const box = focus.length ? focus : nodes;
@@ -53,8 +53,8 @@ function FitView({ token }) {
         maxY = Math.max(maxY, node.position.y + height);
       }
       if (!Number.isFinite(minX)) return;
-      const avoidRight = rect.width > 700 ? 160 : 16;
-      const avoidBottom = rect.width > 700 ? 120 : 16;
+      const avoidRight = 24;
+      const avoidBottom = 24;
       const padding = 28;
       const fitted = Math.min(
         (rect.width - padding * 2 - avoidRight) / Math.max(1, maxX - minX),

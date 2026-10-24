@@ -23,15 +23,16 @@ npm run check
 
 ## Authoring
 
-The screen is a split. The live preview is on the left, with the preset name and the mesh. The right side is one panel: Presets or Graph. Speed, colors, and intensity sit with the presets. Export and download are in the Export menu. On a phone the preview stacks above that panel.
+The canvas is the editor. It is visible when the app opens and takes most of the window. The library sits in a narrow column: search, the Input, Math, Pattern, Audio, and Output groups, and a Presets section. Choosing a preset loads that shader’s nodes onto the canvas. The other narrow column keeps the live preview on top and the inspector under it. The top line is the shader name, the mesh, and the Export menu. On a phone the graph stays on screen and the preview and library open as sheets.
 
 Add a preset by creating `src/presets/your-shader.js` and one line in `src/presets/index.js`. The file exports `id`, `name`, `description`, `thumbnail`, and `buildGraph()`, which returns nodes and edges the compiler already understands. Save a rendered still at `src/presets/thumbs/your-shader.png`. The comment at the top of `src/presets/index.js` shows the import.
 
+- Start from the current graph, or load a preset and keep editing it. Add nodes, rewire sockets, and change constants on that same graph.
 - Presets: iridescent fresnel, domain-warp noise, pulsing rings, sine interference, holographic stripes, Fourier bands, formula plasma, audio pulse, and a curve ramp. Each one is animated with time.
-- Add nodes with Ctrl+K / Cmd+K. Drag between the colored sockets. A float may feed a vec2, vec3, or color input. Mismatched vectors are refused.
-- Click a node and edit its constants. The preview material rebuilds.
+- Add nodes from the library or with Ctrl+K / Cmd+K. Drag between the colored sockets. A float may feed a vec2, vec3, or color input. Mismatched vectors are refused.
+- Click a node and edit its constants in the inspector. The preview material rebuilds.
 - Delete with the inspector button, Backspace, or Delete. The Material node stays.
-- The tutorial opens on the first visit and again from the Export menu. It asks you to pick a preset, move a tweak, open the graph, and export.
+- The tutorial is in the Export menu. It asks you to add a node or load a preset, edit a constant, and export.
 - Copy export or Download material.js writes a `createMaterial()` function. Paste it into a WebGPU Three.js app. Formula text is parsed into TSL calls. Nothing is passed to `eval`.
 - Audio uses the microphone when you allow it. If permission is missing or denied, use the test tone so the material still moves.
 - The graph is stored in `localStorage` under `tsl-graph.v1`. Reset replaces it with the animated starter.

@@ -4,51 +4,36 @@ const SEEN_KEY = "tsl-graph-tutorial-seen";
 
 const STEPS = [
   {
-    id: "preset",
-    title: "Pick a preset",
-    body: "Choose a shader. Its image is a still of the material, and choosing it loads the graph.",
+    id: "create",
+    title: "Build or load",
+    body: "Add a node from the library, or load a preset onto the canvas.",
   },
   {
-    id: "tweak",
-    title: "Tweak it",
-    body: "Move speed, a color, or intensity in this panel. Those controls are the nodes themselves.",
-  },
-  {
-    id: "graph",
-    title: "Open the graph",
-    body: "Switch to Graph. Edit a node and the same shader updates.",
+    id: "edit",
+    title: "Edit a constant",
+    body: "Select a node and change a value. The preview uses that same graph.",
   },
   {
     id: "export",
     title: "Export",
-    body: "Open Export and copy the TSL, or download material.js.",
+    body: "Copy the TSL export or download material.js.",
   },
 ];
 
-export function tutorialSeen() {
-  try {
-    return localStorage.getItem(SEEN_KEY) === "1";
-  } catch {
-    return true;
-  }
-}
-
-export function Tutorial({ activePreset, tweakSignal, graphOpens, exportSignal, onClose }) {
+export function Tutorial({ librarySignal, tweakSignal, exportSignal, onClose }) {
   const [step, setStep] = useState(0);
   const baseline = useRef(null);
   if (!baseline.current) {
-    baseline.current = { activePreset, tweakSignal, graphOpens, exportSignal };
+    baseline.current = { librarySignal, tweakSignal, exportSignal };
   }
   const base = baseline.current;
   const current = STEPS[step];
   const ready =
     step === 0
-      ? Boolean(activePreset) && activePreset !== base.activePreset
+      ? librarySignal > base.librarySignal
       : step === 1
         ? tweakSignal > base.tweakSignal
-        : step === 2
-          ? graphOpens > base.graphOpens
-          : exportSignal > base.exportSignal;
+        : exportSignal > base.exportSignal;
   const last = step === STEPS.length - 1;
 
   function close() {
@@ -85,7 +70,7 @@ export function Tutorial({ activePreset, tweakSignal, graphOpens, exportSignal, 
               close();
               return;
             }
-            baseline.current = { activePreset, tweakSignal, graphOpens, exportSignal };
+            baseline.current = { librarySignal, tweakSignal, exportSignal };
             setStep(step + 1);
           }}
         >
