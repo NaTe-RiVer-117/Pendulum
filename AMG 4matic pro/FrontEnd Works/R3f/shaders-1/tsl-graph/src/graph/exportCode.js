@@ -302,8 +302,13 @@ export function exportGraph(nodes, edges) {
       lines.push(`  const ${name} = ${emitFourier(sample, values)};`);
     } else if (kind === "formula") {
       let emitted;
+      const edge = incoming.get(`${node.id}:t`);
+      const timeExpr =
+        edge && typing.outputType(edge.source, edge.sourceHandle) === "float"
+          ? sourceExpr(edge)
+          : "time";
       try {
-        emitted = emitFormula(parseFormula(values.expr));
+        emitted = emitFormula(parseFormula(values.expr), timeExpr);
       } catch (error) {
         throw new Error(error?.message || "Formula could not be parsed.");
       }

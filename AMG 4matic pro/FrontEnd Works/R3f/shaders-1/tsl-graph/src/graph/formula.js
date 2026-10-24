@@ -148,15 +148,15 @@ export function parseFormula(source) {
 
 const BINARY = { "+": "add", "-": "sub", "*": "mul", "/": "div" };
 
-export function emitFormula(ast) {
+export function emitFormula(ast, timeExpr = "time") {
   const used = new Set(["float"]);
 
   function walk(node) {
     if (node.type === "number") return `float(${node.value})`;
     if (node.type === "ident") {
       if (node.name === "time") {
-        used.add("time");
-        return "time";
+        if (timeExpr === "time") used.add("time");
+        return timeExpr;
       }
       used.add("uv");
       return node.name === "uv.x" ? "uv().x" : "uv().y";

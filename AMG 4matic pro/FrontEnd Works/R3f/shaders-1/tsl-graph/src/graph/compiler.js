@@ -343,11 +343,13 @@ export function compileGraph(nodes, edges) {
       } catch (error) {
         throw new Error(error?.message || "Formula could not be parsed.");
       }
+      const part = readInput(node, "t");
+      const timeNode = part?.type === "float" ? part.value : tslTime;
       return {
         out: {
           value: compileFormula(ast, {
             float: tslFloat,
-            time: tslTime,
+            time: timeNode,
             uv: tslUv,
             add: tslAdd,
             sub: tslSub,

@@ -4,35 +4,26 @@ const SEEN_KEY = "tsl-graph-tutorial-seen";
 
 const STEPS = [
   {
-    id: "add",
-    title: "Add a node",
-    body: "Add a node from the library on the left, or press Ctrl+K and pick one.",
+    id: "preset",
+    title: "Pick a preset",
+    body: "Choose a shader card. It loads a finished animated graph into the preview.",
   },
   {
-    id: "connect",
-    title: "Connect it",
-    body: "Drag from a colored output to an input. A float can feed a vec2, vec3, or color. Other mismatches are refused.",
+    id: "tweak",
+    title: "Tweak it",
+    body: "Move speed, a color, or intensity. Those controls are real nodes, so the preview rebuilds.",
   },
   {
-    id: "edit",
-    title: "Edit a constant",
-    body: "Select a node and change a number, color, waveform, expression, or curve point in the inspector. The preview rebuilds.",
+    id: "graph",
+    title: "Open the graph",
+    body: "Open the workspace to see the nodes behind the preset. Edit one and the same shader updates.",
   },
   {
     id: "export",
-    title: "Export the shader",
-    body: "Use Copy export or Download .js. The file is three/tsl JavaScript that rebuilds the material.",
+    title: "Export",
+    body: "Copy the TSL export or download material.js. It is three/tsl, not handwritten GLSL.",
   },
 ];
-
-function capture(nodes, edges, exportSignal) {
-  return {
-    ids: new Set(nodes.map((node) => node.id)),
-    edges: edges.length,
-    values: JSON.stringify(nodes.map((node) => node.data.values)),
-    exports: exportSignal,
-  };
-}
 
 export function tutorialSeen() {
   try {
@@ -42,29 +33,29 @@ export function tutorialSeen() {
   }
 }
 
-export function Tutorial({ nodes, edges, exportSignal, onClose }) {
+export function Tutorial({ activePreset, tweakSignal, graphOpens, exportSignal, onClose }) {
   const [step, setStep] = useState(0);
   const baseline = useRef(null);
-  if (!baseline.current) baseline.current = capture(nodes, edges, exportSignal);
+  if (!baseline.current) {
+    baseline.current = { activePreset, tweakSignal, graphOpens, exportSignal };
+  }
   const base = baseline.current;
   const current = STEPS[step];
   const ready =
     step === 0
-      ? nodes.some((node) => !base.ids.has(node.id))
+      ? Boolean(activePreset) && activePreset !== base.activePreset
       : step === 1
-        ? edges.length > base.edges
+        ? tweakSignal > base.tweakSignal
         : step === 2
-          ? JSON.stringify(nodes.map((node) => node.data.values)) !== base.values
-          : exportSignal > base.exports;
+          ? graphOpens > base.graphOpens
+          : exportSignal > base.exportSignal;
   const last = step === STEPS.length - 1;
 
-  function close(markSeen) {
-    if (markSeen) {
-      try {
-        localStorage.setItem(SEEN_KEY, "1");
-      } catch {
-        /* private mode */
-      }
+  function close() {
+    try {
+      localStorage.setItem(SEEN_KEY, "1");
+    } catch {
+      /* private mode */
     }
     onClose();
   }
@@ -82,7 +73,7 @@ export function Tutorial({ nodes, edges, exportSignal, onClose }) {
       <h2 data-testid="tutorial-title">{current.title}</h2>
       <p>{current.body}</p>
       <div className="tutorial-actions">
-        <button type="button" data-testid="tutorial-skip" onClick={() => close(true)}>
+        <button type="button" data-testid="tutorial-skip" onClick={close}>
           Skip
         </button>
         <button
@@ -91,10 +82,10 @@ export function Tutorial({ nodes, edges, exportSignal, onClose }) {
           disabled={!ready}
           onClick={() => {
             if (last) {
-              close(true);
+              close();
               return;
             }
-            baseline.current = capture(nodes, edges, exportSignal);
+            baseline.current = { activePreset, tweakSignal, graphOpens, exportSignal };
             setStep(step + 1);
           }}
         >

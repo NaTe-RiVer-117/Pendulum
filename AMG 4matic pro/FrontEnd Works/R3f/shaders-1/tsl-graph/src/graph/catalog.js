@@ -143,7 +143,7 @@ export const CATALOG = {
       },
     ],
   }),
-  formula: node("Formula", "Pattern", [], [output("out", "Value")], {
+  formula: node("Formula", "Pattern", [input("t", "Time")], [output("out", "Value")], {
     blurb: "Expression compiled to TSL",
     defaults: { expr: "sin(uv.x * 10.0 + time)" },
     fields: [{ key: "expr", label: "Expression", control: "text" }],

@@ -215,7 +215,7 @@ function inputTypeError(kind, inputId, typeOf) {
       : "Texture UV needs a vec2. A float can promote into it.";
   }
 
-  if (kind === "fourier" || kind === "curve") {
+  if (kind === "fourier" || kind === "curve" || kind === "formula") {
     return sourceType === "float" ? null : "This input needs a float.";
   }
 

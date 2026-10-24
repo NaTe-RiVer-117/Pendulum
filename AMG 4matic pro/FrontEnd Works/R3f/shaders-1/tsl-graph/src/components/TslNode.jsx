@@ -10,7 +10,7 @@ function restingInput(kind, inputId) {
   if (kind === "combine") return "float";
   if (kind === "split" || kind === "noise") return "vec3";
   if (kind === "texture") return "vec2";
-  if (kind === "fourier" || kind === "curve") return "float";
+  if (kind === "fourier" || kind === "curve" || kind === "formula") return "float";
   return "float";
 }
 
@@ -35,13 +35,23 @@ export function TslNode({ id, data, selected }) {
   const typing = useContext(TypeContext);
   if (!def) return null;
 
+  const accent =
+    def.outputs[0] && typing?.outputType(id, def.outputs[0].id)
+      ? typing.color(typing.outputType(id, def.outputs[0].id))
+      : data.kind === "material"
+        ? "#e2c56a"
+        : "#8eb4ff";
+
   return (
     <div
       className={`tsl-node${selected ? " selected" : ""}${data.kind === "material" ? " material" : ""}`}
       data-kind={data.kind}
       data-node-id={id}
     >
-      <header>{def.label}</header>
+      <header>
+        <i style={{ background: accent }} />
+        <strong>{def.label}</strong>
+      </header>
       <div className="ports">
         {def.inputs.map((socket) => {
           const connected = typing?.connectedType(id, socket.id);

@@ -23,11 +23,11 @@ npm run check
 
 ## Authoring
 
-- Add nodes from the grouped library or with Ctrl+K / Cmd+K. Drag between the colored sockets. A float may feed a vec2, vec3, or color input. Mismatched vectors are refused.
-- Click a node and edit its constants. The preview material rebuilds.
+- The preview fills the page. Preset cards along the bottom load a finished animated graph: iridescent fresnel, domain-warp noise, pulsing rings, sine interference, holographic stripes, Fourier bands, formula plasma, audio pulse, and a curve ramp. Speed, colors, and intensity on the glass strip edit the same nodes as the graph.
+- Open Graph, Library, or Inspector beside the preview on a wide screen, or as a bottom sheet on a phone. Add nodes from the library or with Ctrl+K / Cmd+K. Drag between the colored sockets. A float may feed a vec2, vec3, or color input. Mismatched vectors are refused.
+- Click a node and edit its constants in the inspector. The preview material rebuilds.
 - Delete with the inspector button, Backspace, or Delete. The Material node stays.
-- Demos replace the graph with a starter, a Fourier pattern, a formula plasma, an audio-reactive material, or a curve ramp.
-- The tutorial opens on the first visit and again from Tutorial. It asks you to add a node, connect it, edit a constant, and export.
+- The tutorial opens on the first visit and again from Tutorial. It asks you to pick a preset, move a tweak, open the graph, and export.
 - Copy export or Download .js writes a `createMaterial()` function. Paste it into a WebGPU Three.js app. Formula text is parsed into TSL calls. Nothing is passed to `eval`.
 - Audio uses the microphone when you allow it. If permission is missing or denied, use the test tone so the material still moves.
 - The graph is stored in `localStorage` under `tsl-graph.v1`. Reset replaces it with the animated starter.

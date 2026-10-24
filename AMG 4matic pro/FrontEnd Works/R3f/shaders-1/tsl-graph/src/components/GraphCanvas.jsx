@@ -16,39 +16,70 @@ const nodeTypes = { tsl: TslNode };
 function FitView({ token }) {
   const { getNodes, setViewport } = useReactFlow();
   useEffect(() => {
-    const handle = setTimeout(() => {
+    let cancelled = false;
+    let attempt = 0;
+    let handle = 0;
+    function run() {
+      if (cancelled) return;
       const pane = document.querySelector("[data-testid='graph']");
-      if (!pane) return;
-      const rect = pane.getBoundingClientRect();
+      const rect = pane?.getBoundingClientRect();
+      if (!rect || rect.width < 40 || rect.height < 40) {
+        if (attempt < 10) {
+          attempt += 1;
+          handle = window.setTimeout(run, 80);
+        }
+        return;
+      }
+      const nodes = getNodes();
+      if (!nodes.length) return;
+      const material = nodes.find((node) => node.id === "material");
+      const focus = material
+        ? nodes.filter(
+            (node) =>
+              Math.abs(node.position.x - material.position.x) < 820 &&
+              Math.abs(node.position.y - material.position.y) < 640,
+          )
+        : nodes;
+      const box = focus.length ? focus : nodes;
       let minX = Infinity;
       let minY = Infinity;
       let maxX = 0;
       let maxY = 0;
-      for (const node of getNodes()) {
-        const width = node.measured?.width || 180;
-        const height = node.measured?.height || 88;
+      for (const node of box) {
+        const width = node.measured?.width || 220;
+        const height = node.measured?.height || 128;
         minX = Math.min(minX, node.position.x);
         minY = Math.min(minY, node.position.y);
         maxX = Math.max(maxX, node.position.x + width);
         maxY = Math.max(maxY, node.position.y + height);
       }
-      if (!Number.isFinite(minX) || rect.width < 40 || rect.height < 40) return;
-      const padding = 32;
-      const zoom = Math.min(
-        (rect.width - padding * 2) / Math.max(1, maxX - minX),
-        (rect.height - padding * 2) / Math.max(1, maxY - minY),
-        1.1,
+      if (!Number.isFinite(minX)) return;
+      const avoidRight = rect.width > 700 ? 160 : 16;
+      const avoidBottom = rect.width > 700 ? 120 : 16;
+      const padding = 28;
+      const fitted = Math.min(
+        (rect.width - padding * 2 - avoidRight) / Math.max(1, maxX - minX),
+        (rect.height - padding * 2 - avoidBottom) / Math.max(1, maxY - minY),
       );
+      const zoom = Math.min(1.05, Math.max(0.62, fitted));
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      const viewW = rect.width - avoidRight;
+      const viewH = rect.height - avoidBottom;
       setViewport(
         {
-          x: padding - minX * zoom,
-          y: padding - minY * zoom,
+          x: viewW / 2 - cx * zoom,
+          y: viewH / 2 - cy * zoom,
           zoom,
         },
-        { duration: token === 0 ? 0 : 200 },
+        { duration: token === 0 ? 0 : 180 },
       );
-    }, 150);
-    return () => clearTimeout(handle);
+    }
+    handle = window.setTimeout(run, 80);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(handle);
+    };
   }, [token, getNodes, setViewport]);
   return null;
 }
@@ -155,8 +186,7 @@ export function GraphCanvas({
           connectionRadius={32}
           nodeTypes={nodeTypes}
           colorMode="dark"
-          fitView
-          fitViewOptions={{ padding: 0.18 }}
+          fitView={false}
           deleteKeyCode={["Backspace", "Delete"]}
           proOptions={{ hideAttribution: false }}
           onConnectStart={() => {
