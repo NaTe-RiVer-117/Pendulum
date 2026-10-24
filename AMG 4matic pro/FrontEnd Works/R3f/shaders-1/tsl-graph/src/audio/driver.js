@@ -252,6 +252,25 @@ export async function startMicrophone() {
   }
 }
 
+export async function setAudioSource(mode) {
+  if (mode === "tone") {
+    if (source === "tone") return;
+    await startTestTone();
+    return;
+  }
+  if (mode === "mic") {
+    if (source === "mic") return;
+    await startMicrophone();
+    return;
+  }
+  stopTone();
+  stopMic();
+  source = "none";
+  detail = "Audio is idle.";
+  writeBands({ bass: 0, mid: 0, high: 0, level: 0 }, 1);
+  publish();
+}
+
 export async function ensureShaderMotion() {
   if (source === "mic" || source === "tone" || mic === "requesting") return;
   try {

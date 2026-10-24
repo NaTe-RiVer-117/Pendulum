@@ -1,10 +1,11 @@
 import { ReactFlowProvider, useEdgesState, useNodesState, useReactFlow } from "@xyflow/react";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ensureShaderMotion } from "./audio/driver.js";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { setAudioSource } from "./audio/driver.js";
 import { CommandPalette } from "./components/CommandPalette.jsx";
 import { GraphCanvas } from "./components/GraphCanvas.jsx";
 import { Inspector } from "./components/Inspector.jsx";
 import { Palette } from "./components/Palette.jsx";
+import { PostStack } from "./components/PostStack.jsx";
 import { PresetMenu } from "./components/PresetMenu.jsx";
 import { Preview } from "./components/Preview.jsx";
 import { Tutorial } from "./components/Tutorial.jsx";
@@ -12,8 +13,11 @@ import { createNode } from "./graph/catalog.js";
 import { compileGraph } from "./graph/compiler.js";
 import { createExampleGraph } from "./graph/exampleGraph.js";
 import { exportGraph } from "./graph/exportCode.js";
+import { DEFAULT_POST } from "./graph/post.js";
 import { loadGraph, saveGraph } from "./graph/storage.js";
 import { PRESETS } from "./presets/index.js";
+
+const HISTORY_LIMIT = 50;
 
 function hashString(text) {
   let hash = 2166136261;
@@ -45,18 +49,67 @@ function Shell() {
   const [presetsOpen, setPresetsOpen] = useState(false);
   const [sheet, setSheet] = useState(null);
   const [backendLabel, setBackendLabel] = useState("Starting WebGPU…");
+  const [post, setPost] = useState(DEFAULT_POST);
+  const [canUndo, setCanUndo] = useState(false);
+  const [canRedo, setCanRedo] = useState(false);
+  const past = useRef([]);
+  const future = useRef([]);
+  const present = useRef({});
+  const postGesture = useRef(false);
   const { screenToFlowPosition } = useReactFlow();
   const onStatus = useCallback((label) => setBackendLabel(label), []);
+  present.current = { nodes, edges, post, shaderName, activePreset };
+
+  function remember() {
+    past.current.push(JSON.parse(JSON.stringify(present.current)));
+    if (past.current.length > HISTORY_LIMIT) past.current.shift();
+    future.current = [];
+    setCanUndo(true);
+    setCanRedo(false);
+  }
+
+  function restore(snap) {
+    setNodes(snap.nodes);
+    setEdges(snap.edges);
+    setPost(snap.post);
+    setShaderName(snap.shaderName);
+    setActivePreset(snap.activePreset);
+    setCanUndo(past.current.length > 0);
+    setCanRedo(future.current.length > 0);
+  }
+
+  function undo() {
+    const snap = past.current.pop();
+    if (!snap) return;
+    future.current.push(JSON.parse(JSON.stringify(present.current)));
+    restore(snap);
+  }
+
+  function redo() {
+    const snap = future.current.pop();
+    if (!snap) return;
+    past.current.push(JSON.parse(JSON.stringify(present.current)));
+    restore(snap);
+  }
 
   useEffect(() => {
     const result = saveGraph({ nodes, edges });
     if (!result.ok) setNotice(result.error);
   }, [nodes, edges]);
 
-  const hasAudio = nodes.some((node) => node.data.kind === "audio");
+  const audioMode = nodes.find((node) => node.data.kind === "audio")?.data.values?.source;
   useEffect(() => {
-    if (hasAudio) ensureShaderMotion();
-  }, [hasAudio]);
+    if (!audioMode) return;
+    setAudioSource(audioMode);
+  }, [audioMode]);
+
+  useEffect(() => {
+    function endGesture() {
+      postGesture.current = false;
+    }
+    window.addEventListener("pointerup", endGesture);
+    return () => window.removeEventListener("pointerup", endGesture);
+  }, []);
 
   useEffect(() => {
     if (!menuOpen && !presetsOpen) return undefined;
@@ -71,10 +124,11 @@ function Shell() {
   useEffect(() => {
     function onKey(event) {
       const target = event.target;
+      const field = target instanceof HTMLElement ? target.getAttribute("data-testid") : "";
       const typing =
-        target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
-        target instanceof HTMLSelectElement;
+        field === "shader-name" ||
+        field === "palette-search";
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
         setCommandOpen((open) => !open);
@@ -82,6 +136,15 @@ function Shell() {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s" && event.shiftKey) {
         event.preventDefault();
         downloadExport();
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z" && !typing) {
+        event.preventDefault();
+        if (event.shiftKey) redo();
+        else undo();
+      }
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "y" && !typing) {
+        event.preventDefault();
+        redo();
       }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "enter" && !typing) {
         event.preventDefault();
@@ -124,19 +187,55 @@ function Shell() {
   const onNotice = useCallback((message) => setNotice(message), []);
 
   function updateValue(id, key, value) {
+    const node = nodes.find((item) => item.id === id);
+    if (!node) return;
+    if (JSON.stringify(node.data.values?.[key]) === JSON.stringify(value)) return;
+    remember();
     setTweakSignal((signal) => signal + 1);
     setNodes((current) =>
-      current.map((node) =>
-        node.id === id
-          ? { ...node, data: { ...node.data, values: { ...node.data.values, [key]: value } } }
-          : node,
+      current.map((item) =>
+        item.id === id
+          ? { ...item, data: { ...item.data, values: { ...item.data.values, [key]: value } } }
+          : item,
       ),
     );
+    if (node.data.kind === "audio" && key === "source") setAudioSource(value);
   }
 
   function deleteNode(id) {
+    remember();
     setNodes((current) => current.filter((node) => node.id !== id || node.data.kind === "material"));
     setEdges((current) => current.filter((edge) => edge.source !== id && edge.target !== id));
+  }
+
+  function handleNodesChange(changes) {
+    if (changes.some((change) => change.type === "remove")) remember();
+    onNodesChange(changes);
+  }
+
+  function handleEdgesChange(changes) {
+    if (changes.some((change) => change.type === "remove")) remember();
+    onEdgesChange(changes);
+  }
+
+  function commitEdges(updater) {
+    remember();
+    setEdges(updater);
+  }
+
+  function togglePost(id, enabled) {
+    remember();
+    setPost((current) => ({ ...current, [id]: { ...current[id], enabled } }));
+  }
+
+  function beginPost() {
+    if (postGesture.current) return;
+    postGesture.current = true;
+    remember();
+  }
+
+  function editPost(id, key, value) {
+    setPost((current) => ({ ...current, [id]: { ...current[id], [key]: value } }));
   }
 
   function addKind(kind) {
@@ -149,6 +248,7 @@ function Shell() {
     position.x += Math.round((Math.random() - 0.5) * 36);
     position.y += Math.round((Math.random() - 0.5) * 36);
     const id = `${kind}-${crypto.randomUUID().slice(0, 8)}`;
+    remember();
     setNodes((current) => current.concat(createNode(kind, id, position)));
     setLibrarySignal((signal) => signal + 1);
     setSheet(null);
@@ -156,6 +256,7 @@ function Shell() {
   }
 
   function loadGraphState(next, presetId = null, name = null) {
+    remember();
     setNodes(next.nodes);
     setEdges(next.edges);
     setActivePreset(presetId);
@@ -182,7 +283,7 @@ function Shell() {
   async function copyExport() {
     setMenuOpen(false);
     try {
-      const code = exportGraph(nodes, edges);
+      const code = exportGraph(nodes, edges, post);
       setExportText(code);
       setExportOpen(true);
       setExportSignal((value) => value + 1);
@@ -200,7 +301,7 @@ function Shell() {
   function downloadExport() {
     setMenuOpen(false);
     try {
-      const code = exportGraph(nodes, edges);
+      const code = exportGraph(nodes, edges, post);
       const blob = new Blob([code], { type: "text/javascript" });
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
@@ -235,6 +336,14 @@ function Shell() {
         <button type="button" className="sheet-toggle" data-testid="open-preview" onClick={() => setSheet("preview")}>
           Preview
         </button>
+        <div className="history">
+          <button type="button" data-testid="undo" disabled={!canUndo} onClick={undo}>
+            Undo
+          </button>
+          <button type="button" data-testid="redo" disabled={!canRedo} onClick={redo}>
+            Redo
+          </button>
+        </div>
         <div className="top-tools">
         <label className="mesh">
           Mesh
@@ -310,9 +419,9 @@ function Shell() {
           <GraphCanvas
             nodes={nodes}
             edges={edges}
-            onNodesChange={onNodesChange}
-            onEdgesChange={onEdgesChange}
-            setEdges={setEdges}
+            onNodesChange={handleNodesChange}
+            onEdgesChange={handleEdgesChange}
+            setEdges={commitEdges}
             onNotice={onNotice}
             fitToken={fitToken}
           />
@@ -329,12 +438,14 @@ function Shell() {
               compiled={compiled}
               materialKey={materialKey}
               primitive={primitive}
+              post={post}
               onStatus={onStatus}
             />
           </div>
           <p className="backend" data-testid="preview-status">
             {backendLabel}
           </p>
+          <PostStack post={post} onToggle={togglePost} onBegin={beginPost} onValue={editPost} />
           {notice && (
             <p className="note" data-testid="notice">
               {notice}

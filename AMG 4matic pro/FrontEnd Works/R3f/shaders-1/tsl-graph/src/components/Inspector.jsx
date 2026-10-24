@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { getAudioSnapshot, startMicrophone, startTestTone, subscribeAudio } from "../audio/driver.js";
+import { getAudioSnapshot, subscribeAudio } from "../audio/driver.js";
 import { CATALOG } from "../graph/catalog.js";
 import { parseFormula } from "../graph/formula.js";
 import { sanitizeCurve } from "../graph/series.js";
@@ -149,7 +149,7 @@ function CurveEditor({ points, onChange }) {
   );
 }
 
-function AudioPanel() {
+function AudioPanel({ onPick }) {
   const [state, setState] = useState(getAudioSnapshot);
   const canvasRef = useRef(null);
 
@@ -214,10 +214,10 @@ function AudioPanel() {
       </p>
       <canvas ref={canvasRef} data-testid="audio-spectrum" width="320" height="84" />
       <div className="audio-actions">
-        <button type="button" data-testid="audio-mic" onClick={() => startMicrophone()}>
+        <button type="button" data-testid="audio-mic" onClick={() => onPick("mic")}>
           Use microphone
         </button>
-        <button type="button" data-testid="audio-tone" onClick={() => startTestTone()}>
+        <button type="button" data-testid="audio-tone" onClick={() => onPick("tone")}>
           Test tone
         </button>
       </div>
@@ -236,7 +236,7 @@ export function Inspector({ selected, onChange, onDelete, onNotice }) {
         <p>{selected.length > 1 ? "Select one node." : "Select a node to edit its constants."}</p>
       )}
       {def?.blurb && <p className="blurb">{def.blurb}</p>}
-      {node?.data.kind === "audio" && <AudioPanel />}
+      {node?.data.kind === "audio" && <AudioPanel onPick={(mode) => onChange(node.id, "source", mode)} />}
       {def && def.fields.length === 0 && node?.data.kind !== "audio" && <p>This node has no constants.</p>}
       {def?.fields.map((field) => (
         <label key={field.key} className="field">

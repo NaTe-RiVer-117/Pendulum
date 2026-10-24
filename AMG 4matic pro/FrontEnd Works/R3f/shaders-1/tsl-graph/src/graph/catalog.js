@@ -170,7 +170,22 @@ export const CATALOG = {
       output("high", "High"),
       output("level", "Level"),
     ],
-    { blurb: "Microphone bands" },
+    {
+      blurb: "Microphone bands",
+      defaults: { source: "tone" },
+      fields: [
+        {
+          key: "source",
+          label: "Mode",
+          control: "select",
+          options: [
+            { value: "tone", label: "Test tone" },
+            { value: "mic", label: "Microphone" },
+            { value: "none", label: "Idle" },
+          ],
+        },
+      ],
+    },
   ),
   material: node(
     "Material",

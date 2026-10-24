@@ -1,5 +1,6 @@
 import { CATALOG, INPUT_DEFAULTS } from "./catalog.js";
 import { emitFormula, parseFormula } from "./formula.js";
+import { emitPost } from "./post.js";
 import { emitCurve, emitFourier } from "./series.js";
 import { analyze, explainGraph } from "./types.js";
 
@@ -117,7 +118,7 @@ function checkerSource() {
 }`;
 }
 
-export function exportGraph(nodes, edges) {
+export function exportGraph(nodes, edges, post) {
   const problem = explainGraph(nodes, edges);
   if (problem) throw new Error(problem);
   const material = nodes.find((node) => node.data.kind === "material");
@@ -127,7 +128,7 @@ export function exportGraph(nodes, edges) {
   const nodeById = new Map(nodes.map((node) => [node.id, node]));
   const incoming = new Map();
   for (const edge of edges) incoming.set(`${edge.target}:${edge.targetHandle}`, edge);
-  const used = new Set(["float", "vec2", "vec3", "color"]);
+  const used = new Set(["float", "vec2", "vec3", "vec4", "color", "mix", "pass", "saturation"]);
   const lines = [];
   let needsChecker = false;
   let needsAudio = false;
@@ -389,6 +390,9 @@ export function exportGraph(nodes, edges) {
     "uv",
     "vec2",
     "vec3",
+    "vec4",
+    "pass",
+    "saturation",
   ].filter((name) => used.has(name));
 
   const helper = `${needsChecker ? `\n${checkerSource()}\n` : ""}${needsAudio ? `\n${audioSource()}\n` : ""}`;
@@ -401,7 +405,7 @@ ${helper}
 export function createMaterial() {
 ${lines.join("\n")}
 }
-`;
+${emitPost(post)}`;
 }
 
 function audioSource() {

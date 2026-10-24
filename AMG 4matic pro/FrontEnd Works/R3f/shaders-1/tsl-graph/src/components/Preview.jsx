@@ -1,8 +1,13 @@
 import { Environment, OrbitControls } from "@react-three/drei";
-import { Canvas, extend, useFrame } from "@react-three/fiber";
+import { Canvas, extend, useFrame, useThree } from "@react-three/fiber";
 import { Component, Suspense, useCallback, useEffect, useRef, useState } from "react";
+import { bloom } from "three/examples/jsm/tsl/display/BloomNode.js";
+import { film } from "three/examples/jsm/tsl/display/FilmNode.js";
+import { rgbShift } from "three/examples/jsm/tsl/display/RGBShiftNode.js";
+import { mix, pass, saturation, uniform, vec3, vec4 } from "three/tsl";
 import * as THREE from "three/webgpu";
 import { tickAudio } from "../audio/driver.js";
+import { sanitizePost } from "../graph/post.js";
 
 extend({
   MeshStandardNodeMaterial: THREE.MeshStandardNodeMaterial,
@@ -26,6 +31,100 @@ class QuietBoundary extends Component {
     if (this.state.error) return null;
     return this.props.children;
   }
+}
+
+function PostPass({ post }) {
+  const { gl, scene, camera } = useThree();
+  const chain = useRef(null);
+  const settings = sanitizePost(post);
+  const signature = [
+    settings.bloom.enabled,
+    settings.fringe.enabled,
+    settings.grain.enabled,
+    settings.grade.enabled,
+  ].join("|");
+  const live = useRef(settings);
+  live.current = settings;
+
+  useEffect(() => {
+    const any =
+      settings.bloom.enabled ||
+      settings.fringe.enabled ||
+      settings.grain.enabled ||
+      settings.grade.enabled;
+    if (!any) {
+      chain.current = null;
+      return undefined;
+    }
+    try {
+      let color = pass(scene, camera).getTextureNode("output");
+      const handles = {};
+      if (settings.bloom.enabled) {
+        const node = bloom(color, settings.bloom.strength, settings.bloom.radius, settings.bloom.threshold);
+        handles.bloom = node;
+        color = color.add(node);
+      }
+      if (settings.fringe.enabled) {
+        const node = rgbShift(color, settings.fringe.amount, settings.fringe.angle);
+        handles.fringe = node;
+        color = node;
+      }
+      if (settings.grain.enabled) {
+        const intensity = uniform(settings.grain.intensity);
+        handles.grain = intensity;
+        color = film(color, intensity);
+      }
+      if (settings.grade.enabled) {
+        const contrast = uniform(settings.grade.contrast);
+        const grade = uniform(settings.grade.saturation);
+        handles.grade = { contrast, grade };
+        const graded = saturation(mix(vec3(0.5), color.rgb, contrast), grade);
+        color = vec4(graded, color.a);
+      }
+      const processing = new THREE.PostProcessing(gl);
+      processing.outputNode = color;
+      chain.current = { processing, handles };
+      return () => {
+        chain.current = null;
+        processing.dispose();
+      };
+    } catch (error) {
+      console.error(error);
+      chain.current = null;
+      return undefined;
+    }
+  }, [gl, scene, camera, signature]);
+
+  useFrame(() => {
+    const current = chain.current;
+    const next = live.current;
+    if (!current) {
+      gl.render(scene, camera);
+      return;
+    }
+    try {
+      if (current.handles.bloom) {
+        current.handles.bloom.strength.value = next.bloom.strength;
+        current.handles.bloom.radius.value = next.bloom.radius;
+        current.handles.bloom.threshold.value = next.bloom.threshold;
+      }
+      if (current.handles.fringe) {
+        current.handles.fringe.amount.value = next.fringe.amount;
+        current.handles.fringe.angle.value = next.fringe.angle;
+      }
+      if (current.handles.grain) current.handles.grain.value = next.grain.intensity;
+      if (current.handles.grade) {
+        current.handles.grade.contrast.value = next.grade.contrast;
+        current.handles.grade.grade.value = next.grade.saturation;
+      }
+      current.processing.render();
+    } catch (error) {
+      console.error(error);
+      chain.current = null;
+    }
+  }, 1);
+
+  return null;
 }
 
 function FrameProbe({ onFrame }) {
@@ -62,7 +161,7 @@ function PreviewMesh({ shown, shownKey, primitive }) {
   );
 }
 
-export function Preview({ compiled, materialKey, primitive, onStatus }) {
+export function Preview({ compiled, materialKey, primitive, post, onStatus }) {
   const [frameloop, setFrameloop] = useState("never");
   const [backend, setBackend] = useState("starting");
   const [backendDetail, setBackendDetail] = useState("");
@@ -142,6 +241,7 @@ export function Preview({ compiled, materialKey, primitive, onStatus }) {
           <meshStandardNodeMaterial color="#1a1d24" roughness={0.92} metalness={0.04} />
         </mesh>
         <FrameProbe onFrame={setFrames} />
+        <PostPass post={post} />
         <OrbitControls enableDamping makeDefault />
       </Canvas>
     </div>
