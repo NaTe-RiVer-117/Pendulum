@@ -23,7 +23,7 @@ npm run check
 
 ## Authoring
 
-The canvas is the editor. It is visible when the app opens and takes most of the window. The library sits in a narrow column: search, the Input, Math, Pattern, Audio, and Output groups, and a Presets section. Choosing a preset loads that shader’s nodes onto the canvas. The other narrow column keeps the live preview on top and the inspector under it. The top line is the shader name, the mesh, and the Export menu. On a phone the graph stays on screen and the preview and library open as sheets.
+The canvas is the editor. It is visible when the app opens and takes most of the window. The left column is the node library: search, then the Input, Math, Pattern, Audio, and Output groups. Presets live in the Presets menu on the top line. Choosing one loads that shader’s nodes onto the canvas. The right column is a preview viewport with the inspector under it. The top line is the shader name, the mesh, Presets, and Export. On a phone the graph stays on screen, and the library and preview open as sheets.
 
 Add a preset by creating `src/presets/your-shader.js` and one line in `src/presets/index.js`. The file exports `id`, `name`, `description`, `thumbnail`, and `buildGraph()`, which returns nodes and edges the compiler already understands. Save a rendered still at `src/presets/thumbs/your-shader.png`. The comment at the top of `src/presets/index.js` shows the import.
 

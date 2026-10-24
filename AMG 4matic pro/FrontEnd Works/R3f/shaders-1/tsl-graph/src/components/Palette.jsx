@@ -2,8 +2,9 @@ import { useMemo, useState } from "react";
 import { CATALOG, LIBRARY_GROUPS } from "../graph/catalog.js";
 import { TYPE_COLOR, VALUE_TYPES } from "../graph/types.js";
 
-export function Palette({ onAdd, presets, activePreset, onPreset }) {
+export function Palette({ onAdd }) {
   const [query, setQuery] = useState("");
+  const [openGroups, setOpenGroups] = useState(() => new Set(["Input"]));
   const needle = query.trim().toLowerCase();
   const groups = useMemo(() => {
     return LIBRARY_GROUPS.map((group) => ({
@@ -15,14 +16,20 @@ export function Palette({ onAdd, presets, activePreset, onPreset }) {
       }),
     })).filter((group) => group.kinds.length > 0);
   }, [needle]);
-  const presetRows = presets.filter((preset) =>
-    `${preset.name} ${preset.description} ${preset.id}`.toLowerCase().includes(needle),
-  );
+
+  function toggleGroup(id) {
+    setOpenGroups((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
 
   return (
     <aside className="palette">
       <div className="library-head">
-        <strong>Library</strong>
+        <strong>Nodes</strong>
         <span>Ctrl+K</span>
       </div>
       <label className="search">
@@ -35,48 +42,46 @@ export function Palette({ onAdd, presets, activePreset, onPreset }) {
         />
       </label>
       <div className="palette-list">
-        {groups.map((group) => (
-          <section key={group.id} className="library-group" data-testid={`group-${group.id}`}>
-            <h2>{group.id}</h2>
-            {group.kinds.map((kind) => {
-              const def = CATALOG[kind];
-              if (kind === "material") {
-                return (
-                  <p key={kind} className="library-note">
-                    Material is already in the graph.
-                  </p>
-                );
-              }
-              return (
-                <button key={kind} type="button" data-testid={`add-${kind}`} onClick={() => onAdd(kind)}>
-                  <strong>{def.label}</strong>
-                  <small>{def.blurb || def.category}</small>
-                </button>
-              );
-            })}
-          </section>
-        ))}
-        {presetRows.length > 0 && (
-          <section className="library-group" data-testid="group-presets">
-            <h2>Presets</h2>
-            {presetRows.map((preset) => (
+        {groups.map((group) => {
+          const expanded = needle.length > 0 || openGroups.has(group.id);
+          return (
+            <section key={group.id} className="library-group" data-testid={`group-${group.id}`}>
               <button
-                key={preset.id}
                 type="button"
-                className={`preset-row${preset.id === activePreset ? " active" : ""}`}
-                data-testid={`preset-${preset.id}`}
-                onClick={() => onPreset(preset)}
+                className="group-toggle"
+                aria-expanded={expanded}
+                onClick={() => toggleGroup(group.id)}
               >
-                <img src={preset.thumbnail} alt="" />
-                <span>
-                  <strong>{preset.name}</strong>
-                  <small>{preset.description}</small>
-                </span>
+                <span>{group.id}</span>
+                <small>{group.kinds.length}</small>
               </button>
-            ))}
-          </section>
-        )}
-        {groups.length === 0 && presetRows.length === 0 && <p className="empty">No matching nodes.</p>}
+              {expanded &&
+                group.kinds.map((kind) => {
+                  const def = CATALOG[kind];
+                  if (kind === "material") {
+                    return (
+                      <p key={kind} className="library-note">
+                        Material is already in the graph.
+                      </p>
+                    );
+                  }
+                  return (
+                    <button
+                      key={kind}
+                      type="button"
+                      className="node-add"
+                      data-testid={`add-${kind}`}
+                      onClick={() => onAdd(kind)}
+                    >
+                      <strong>{def.label}</strong>
+                      <small>{def.blurb || def.category}</small>
+                    </button>
+                  );
+                })}
+            </section>
+          );
+        })}
+        {groups.length === 0 && <p className="empty">No matching nodes.</p>}
       </div>
       <div className="legend">
         {VALUE_TYPES.map((type) => (

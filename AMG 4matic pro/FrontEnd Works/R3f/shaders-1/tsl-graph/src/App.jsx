@@ -5,6 +5,7 @@ import { CommandPalette } from "./components/CommandPalette.jsx";
 import { GraphCanvas } from "./components/GraphCanvas.jsx";
 import { Inspector } from "./components/Inspector.jsx";
 import { Palette } from "./components/Palette.jsx";
+import { PresetMenu } from "./components/PresetMenu.jsx";
 import { Preview } from "./components/Preview.jsx";
 import { Tutorial } from "./components/Tutorial.jsx";
 import { createNode } from "./graph/catalog.js";
@@ -41,6 +42,7 @@ function Shell() {
   const [tutorialSession, setTutorialSession] = useState(0);
   const [activePreset, setActivePreset] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [presetsOpen, setPresetsOpen] = useState(false);
   const [sheet, setSheet] = useState(null);
   const [backendLabel, setBackendLabel] = useState("Starting WebGPU…");
   const { screenToFlowPosition } = useReactFlow();
@@ -57,13 +59,14 @@ function Shell() {
   }, [hasAudio]);
 
   useEffect(() => {
-    if (!menuOpen) return undefined;
+    if (!menuOpen && !presetsOpen) return undefined;
     function onPointer(event) {
-      if (!event.target.closest?.(".quiet")) setMenuOpen(false);
+      if (menuOpen && !event.target.closest?.(".quiet")) setMenuOpen(false);
+      if (presetsOpen && !event.target.closest?.(".preset-pop")) setPresetsOpen(false);
     }
     window.addEventListener("pointerdown", onPointer);
     return () => window.removeEventListener("pointerdown", onPointer);
-  }, [menuOpen]);
+  }, [menuOpen, presetsOpen]);
 
   useEffect(() => {
     function onKey(event) {
@@ -165,6 +168,7 @@ function Shell() {
 
   function loadPreset(nextPreset) {
     setLibrarySignal((signal) => signal + 1);
+    setPresetsOpen(false);
     loadGraphState(nextPreset.buildGraph(), nextPreset.id, nextPreset.name);
   }
 
@@ -231,6 +235,7 @@ function Shell() {
         <button type="button" className="sheet-toggle" data-testid="open-preview" onClick={() => setSheet("preview")}>
           Preview
         </button>
+        <div className="top-tools">
         <label className="mesh">
           Mesh
           <select
@@ -244,12 +249,25 @@ function Shell() {
             <option value="knot">Torus knot</option>
           </select>
         </label>
+        <PresetMenu
+          presets={PRESETS}
+          activePreset={activePreset}
+          open={presetsOpen}
+          onToggle={() => {
+            setMenuOpen(false);
+            setPresetsOpen((open) => !open);
+          }}
+          onPick={loadPreset}
+        />
         <div className="quiet">
           <button
             type="button"
             data-testid="menu"
             aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((open) => !open)}
+            onClick={() => {
+              setPresetsOpen(false);
+              setMenuOpen((open) => !open);
+            }}
           >
             Export
           </button>
@@ -266,6 +284,7 @@ function Shell() {
               </button>
             </div>
           )}
+        </div>
         </div>
       </header>
       <div className="workspace">
@@ -285,12 +304,7 @@ function Shell() {
               onClose={() => setTutorialOpen(false)}
             />
           )}
-          <Palette
-            onAdd={addKind}
-            presets={PRESETS}
-            activePreset={activePreset}
-            onPreset={loadPreset}
-          />
+          <Palette onAdd={addKind} />
         </div>
         <main className="canvas">
           <GraphCanvas
